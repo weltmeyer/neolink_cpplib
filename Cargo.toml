@@ -11,6 +11,12 @@ members = [
   "crates/*",
 ]
 
+[lib]
+crate-type = ["staticlib", "rlib","cdylib"]
+name = "neolink_lib"
+path = "src/lib.rs"
+debuginfo = 2
+
 [dependencies]
 anyhow = "1.0.70"
 async-stream = "0.3.5"
