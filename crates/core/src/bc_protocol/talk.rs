@@ -323,7 +323,7 @@ impl BcCamera {
 
         let full_block_size = block_size + 4; // Block size + predictor state
         let msg_num = self.new_message_num();
-        let sub = connection.subscribe(MSG_ID_TALK, msg_num).await?;
+        let mut sub = connection.subscribe(MSG_ID_TALK, msg_num).await?;
 
         const BLOCK_PER_PAYLOAD: usize = 1;
         const BLOCK_HEADER_SIZE: usize = 4;
@@ -398,6 +398,7 @@ impl BcCamera {
             };
 
             sub.send(msg).await?;
+            let _ = sub.recv().await?;
 
             std::thread::sleep(std::time::Duration::from_secs_f32(play_length * 0.95));
         }
