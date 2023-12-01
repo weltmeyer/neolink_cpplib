@@ -269,7 +269,6 @@ impl BcCamera {
 
         let block_size = talk_config.audio_config.length_per_encoder / 2;
         let sample_rate = talk_config.audio_config.sample_rate;
-        let block_duration = talk_config.audio_config.length_per_encoder as f32 / talk_config.audio_config.sample_rate as f32;
 
         let msg = Bc {
             meta: BcMeta {
@@ -335,6 +334,7 @@ impl BcCamera {
         let target_chunks = full_block_size as usize * BLOCK_PER_PAYLOAD;
 
         let mut end_of_stream = false;
+        let mut expected_stream_end = std::time::Instant::now();
         while !end_of_stream {
             let mut payload_bytes = vec![];
             while payload_bytes.len() < target_chunks {
@@ -396,17 +396,22 @@ impl BcCamera {
                 }),
             };
 
+            let time_sent = std::time::Instant::now();
             sub.send(msg).await?;
+            let play_length = std::time::Duration::from_secs_f32(play_length);
+            if time_sent > expected_stream_end {
+                expected_stream_end = time_sent + play_length;
+            } else {
+                expected_stream_end += play_length;
+            }
             let _ = sub.recv().await?;
 
         }
 
-        // By observation in the Reolink Doorbell POE the buffer seems to be roughly 10 chunks,
-        // Wait until those buffers are fully flushed out to the audio device before issuing a
-        // talk_stop
-        let buffer_duration = block_duration * (BLOCK_PER_PAYLOAD as f32) * 10.0f32;
-        std::thread::sleep(std::time::Duration::from_secs_f32(buffer_duration));
-        log::info!("Block: {}s, Buffer: {}s", block_duration, buffer_duration);
+        // Chunks are still being played, while talk_stop will interrupt them. Wait until we expect
+        // the stream to end (+ and extra 100ms) before issuing talk_stop.
+        let remaining_stream_duration = expected_stream_end - std::time::Instant::now();
+        std::thread::sleep(remaining_stream_duration + std::time::Duration::from_secs_f32(0.1));
 
         self.talk_stop().await?;
 
