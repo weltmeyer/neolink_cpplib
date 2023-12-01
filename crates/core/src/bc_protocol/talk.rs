@@ -335,6 +335,7 @@ impl BcCamera {
 
         let mut payload_bytes = vec![];
         let mut end_of_stream = false;
+        let mut message_end = std::time::Instant::now();
         while !end_of_stream {
             while payload_bytes.len() < target_chunks {
                 let mut buffer = vec![255; target_chunks - payload_bytes.len()];
@@ -397,11 +398,18 @@ impl BcCamera {
                 }),
             };
 
+            // Wait until 100ms before message end
+            let sleep_until = message_end - std::time::Duration::from_secs_f32(0.1);
+            std::thread::sleep(sleep_until - std::time::Instant::now());
             sub.send(msg).await?;
+            // TODO: What to do against drift ?
+            message_end += std::time::Duration::from_secs_f32(play_length);
             let _ = sub.recv().await?;
 
-            std::thread::sleep(std::time::Duration::from_secs_f32(play_length * 0.95));
         }
+
+        // Wait for the full message to play + 100ms to be sure, before issuing talk stop.
+        std::thread::sleep((message_end - std::time::Instant::now()) + std::time::Duration::from_secs_f32(0.1));
 
         self.talk_stop().await?;
 
