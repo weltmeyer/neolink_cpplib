@@ -269,6 +269,7 @@ impl BcCamera {
 
         let block_size = talk_config.audio_config.length_per_encoder / 2;
         let sample_rate = talk_config.audio_config.sample_rate;
+        let block_duration = talk_config.audio_config.length_per_encoder as f32 / talk_config.audio_config.sample_rate as f32;
 
         let msg = Bc {
             meta: BcMeta {
@@ -334,7 +335,6 @@ impl BcCamera {
         let target_chunks = full_block_size as usize * BLOCK_PER_PAYLOAD;
 
         let mut end_of_stream = false;
-        let mut message_end = std::time::Instant::now();
         while !end_of_stream {
             let mut payload_bytes = vec![];
             while payload_bytes.len() < target_chunks {
@@ -396,18 +396,17 @@ impl BcCamera {
                 }),
             };
 
-            // Wait until 100ms before message end
-            let sleep_until = message_end - std::time::Duration::from_secs_f32(0.1);
-            std::thread::sleep(sleep_until - std::time::Instant::now());
             sub.send(msg).await?;
-            // TODO: What to do against drift ?
-            message_end += std::time::Duration::from_secs_f32(play_length);
             let _ = sub.recv().await?;
 
         }
 
-        // Wait for the full message to play + 100ms to be sure, before issuing talk stop.
-        std::thread::sleep((message_end - std::time::Instant::now()) + std::time::Duration::from_secs_f32(0.1));
+        // By observation in the Reolink Doorbell POE the buffer seems to be roughly 10 chunks,
+        // Wait until those buffers are fully flushed out to the audio device before issuing a
+        // talk_stop
+        let buffer_duration = block_duration * (BLOCK_PER_PAYLOAD as f32) * 10.0f32;
+        std::thread::sleep(std::time::Duration::from_secs_f32(buffer_duration));
+        log::info!("Block: {}s, Buffer: {}s", block_duration, buffer_duration);
 
         self.talk_stop().await?;
 
