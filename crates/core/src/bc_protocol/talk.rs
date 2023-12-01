@@ -333,10 +333,10 @@ impl BcCamera {
 
         let target_chunks = full_block_size as usize * BLOCK_PER_PAYLOAD;
 
-        let mut payload_bytes = vec![];
         let mut end_of_stream = false;
         let mut message_end = std::time::Instant::now();
         while !end_of_stream {
+            let mut payload_bytes = vec![];
             while payload_bytes.len() < target_chunks {
                 let mut buffer = vec![255; target_chunks - payload_bytes.len()];
                 if let Ok(read) = buffered_recv.read(&mut buffer) {
@@ -373,8 +373,6 @@ impl BcCamera {
                 // Zero samples in this block
                 break;
             };
-
-            payload_bytes = vec![];
 
             // Time to play the sample in seconds
             let play_length = samples_sent as f32 / sample_rate as f32;
