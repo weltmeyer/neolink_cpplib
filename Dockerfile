@@ -8,9 +8,6 @@ FROM docker.io/rust:slim-bookworm AS build
 ARG TARGETPLATFORM
 
 ENV DEBIAN_FRONTEND=noninteractive
-ENV NEO_LINK_MODE rtsp
-
-
 WORKDIR /usr/local/src/neolink
 COPY . /usr/local/src/neolink
 
@@ -86,6 +83,8 @@ RUN gst-inspect-1.0; \
     "/usr/local/bin/neolink" --version && \
     mkdir -m 0700 /root/.config/ # Location that the push notifications are cached to
 
-CMD ["/usr/local/bin/neolink", "${NEO_LINK_MODE}", "--config", "/etc/neolink.toml"]
+ENV NEO_LINK_MODE="rtsp" NEO_LINK_PORT=8554
+
+CMD /usr/local/bin/neolink ${NEO_LINK_MODE} --config /etc/neolink.toml
 ENTRYPOINT ["/entrypoint.sh"]
-EXPOSE 8554
+EXPOSE ${NEO_LINK_PORT}
