@@ -456,6 +456,10 @@ docker pull quantumentangledandy/neolink
 # network=host, notably macos lacks this option.
 docker run --network host --volume=$PWD/config.toml:/etc/neolink.toml quantumentangledandy/neolink
 ```
+#### Environmental Variables 
+There are currently 2 environmental variables available as part of the container: 
+- `NEO_LINK_MODE`: defaults to `"rtsp"` if not set, other options are "mqtt" or "mqtt-rtsp".
+- `NEO_LINK_PORT`: defaults to `8554`, set this to your required port value.
 
 ### Image
 
