@@ -467,7 +467,7 @@ async fn listen_on_camera(camera: NeoInstance, mqtt_instance: MqttInstance) -> R
                                 }).await;
                                 let image = match image {
                                     Err(e) => match e.downcast::<neolink_core::Error>() {
-                                        Ok(neolink_core::Error::CameraServiceUnavaliable(_)) => {
+                                        Ok(neolink_core::Error::CameraServiceUnavailable(_)) => {
                                             log::debug!("Image not supported");
                                             futures::future::pending().await
                                         },
@@ -512,7 +512,7 @@ async fn listen_on_camera(camera: NeoInstance, mqtt_instance: MqttInstance) -> R
                                 }).await;
                                 let xml = match xml {
                                     Err(e) => match e.downcast::<neolink_core::Error>() {
-                                        Ok(neolink_core::Error::CameraServiceUnavaliable(_)) => {
+                                        Ok(neolink_core::Error::CameraServiceUnavailable(_)) => {
                                             log::debug!("Battery not supported");
                                             futures::future::pending().await
                                         },

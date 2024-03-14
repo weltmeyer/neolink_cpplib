@@ -36,8 +36,8 @@ pub enum Error {
     },
 
     /// Raised when the camera responds with a status code over than OK
-    #[error(display = "Camera responded with Service Unavaliable: {}", _0)]
-    CameraServiceUnavaliable(u16),
+    #[error(display = "Camera responded with Service Unavailable: {}", _0)]
+    CameraServiceUnavailable(u16),
 
     /// Raised when the camera responds with a status code over than OK during login
     #[error(display = "Camera responded with Err during login")]
@@ -115,7 +115,7 @@ pub enum Error {
 
     /// Raised when the camera cannot be found
     #[error(display = "Camera Not Findable")]
-    ConnectionUnavaliable,
+    ConnectionUnavailable,
 
     /// Raised when the subscription id dropped too soon
     #[error(display = "Dropped Subscriber")]

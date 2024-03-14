@@ -91,10 +91,10 @@ pub struct BcXml {
     /// Recieved on request for battery info
     #[yaserde(rename = "BatteryInfo")]
     pub battery_info: Option<BatteryInfo>,
-    /// Recieved on request for a users persmissions/capabilitoes
+    /// Recieved on request for a users permissions/capabilities
     #[yaserde(rename = "AbilityInfo")]
     pub ability_info: Option<AbilityInfo>,
-    /// Recieved on request for a users persmissions/capabilitoes
+    /// Recieved on request for a users permissions/capabilities
     #[yaserde(rename = "PushInfo")]
     pub push_info: Option<PushInfo>,
     /// Recieved on request for a link type
@@ -112,7 +112,7 @@ pub struct BcXml {
     /// The floodlight settings for automatically turning on/off on schedule/motion
     #[yaserde(rename = "FloodlightTask")]
     pub floodlight_task: Option<FloodlightTask>,
-    /// For geting the zoom anf focus of the camera
+    /// For getting the zoom and focus of the camera
     #[yaserde(rename = "PtzZoomFocus")]
     pub ptz_zoom_focus: Option<PtzZoomFocus>,
     /// For zooming the camera
@@ -268,11 +268,11 @@ pub struct Extension {
     /// XML Version
     #[yaserde(attribute)]
     pub version: String,
-    /// If the subsequent payload is binary this will be set to 1. Otherwise it is ommited
+    /// If the subsequent payload is binary this will be set to 1. Otherwise it is omitted
     #[yaserde(rename = "binaryData")]
     pub binary_data: Option<u32>,
     /// Certain requests such `AbilitySupport` require to know which user this
-    /// ability support request is for (why camera dosen't know this based on who
+    /// ability support request is for (why camera doesn't know this based on who
     /// is logged in is unknown... Possible security hole)
     #[yaserde(rename = "userName")]
     pub user_name: Option<String>,
@@ -497,7 +497,7 @@ pub struct TalkConfig {
     /// audioStreamMode known values `"followVideoStream"`
     #[yaserde(rename = "audioStreamMode")]
     pub audio_stream_mode: String,
-    /// AudioConfig contans the details of the audio to follow
+    /// AudioConfig contains the details of the audio to follow
     #[yaserde(rename = "audioConfig")]
     pub audio_config: AudioConfig,
 }
@@ -541,7 +541,7 @@ pub struct TalkAbility {
     /// audioStreamModes known values `"followVideoStream"`
     #[yaserde(rename = "audioStreamModeList")]
     pub audio_stream_mode_list: Vec<AudioStreamModeList>,
-    /// AudioConfigs contans the details of the audio to follow
+    /// AudioConfigs contains the details of the audio to follow
     #[yaserde(rename = "audioConfigList")]
     pub audio_config_list: Vec<AudioConfigList>,
 }
@@ -706,7 +706,7 @@ pub struct AbilityInfo {
     pub image: Option<AbilityInfoToken>,
     /// Video permissions
     pub video: Option<AbilityInfoToken>,
-    /// Secutiry permissions
+    /// Security permissions
     pub security: Option<AbilityInfoToken>,
     /// Replay permissions
     pub replay: Option<AbilityInfoToken>,

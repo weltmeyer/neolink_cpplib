@@ -323,7 +323,7 @@ async fn stream_run(
         log::debug!("Path: {}", path);
         mounts.add_factory(path, factory.clone());
     }
-    log::info!("{}: Avaliable at {}", name, paths.join(", "));
+    log::info!("{}: Available at {}", name, paths.join(", "));
 
     let stream_cancel = CancellationToken::new();
     let drop_guard = stream_cancel.clone().drop_guard();
