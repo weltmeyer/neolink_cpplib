@@ -17,7 +17,7 @@ pub enum StreamKind {
     Sub,
     /// This stream represents a balance between SD and HD
     ///
-    /// It is only avaliable on some camera. If the camera dosen't
+    /// It is only available on some camera. If the camera doesn't
     /// support it the stream will be the same as the SD stream
     Extern,
 }
@@ -155,7 +155,7 @@ impl BcCamera {
                 StreamKind::Extern => 0,
             };
 
-            // Theses are the numbers used with the offical client
+            // Theses are the numbers used with the official client
             // On an E1 and swann cameras:
             //  - mainStream always has a value of 0
             //  - subStream always has a value of 1
@@ -271,7 +271,7 @@ impl BcCamera {
                             msg_id: MSG_ID_VIDEO_STOP,
                             ..
                         }   = msg.meta {
-                            return Err(Error::CameraServiceUnavaliable(msg.meta.response_code));
+                            return Err(Error::CameraServiceUnavailable(msg.meta.response_code));
                         }
                     }
                 } => v,
@@ -313,7 +313,7 @@ impl BcCamera {
             StreamKind::Extern => 0,
         };
 
-        // Theses are the numbers used with the offical client
+        // Theses are the numbers used with the official client
         // On an E1 and swann cameras:
         //  - mainStream always has a value of 0
         //  - subStream always has a value of 1
@@ -352,7 +352,7 @@ impl BcCamera {
 
         let reply = sub_video.recv().await?;
         if reply.meta.response_code != 200 {
-            return Err(Error::CameraServiceUnavaliable(reply.meta.response_code));
+            return Err(Error::CameraServiceUnavailable(reply.meta.response_code));
         }
 
         Ok(())

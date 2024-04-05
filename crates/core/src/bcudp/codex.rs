@@ -34,7 +34,7 @@ impl Decoder for BcUdpCodex {
     type Item = BcUdp;
     type Error = Error;
 
-    /// Since frames can cross EOF boundaries we overload this so it dosen't error if
+    /// Since frames can cross EOF boundaries we overload this so it doesn't error if
     /// there are bytes left on the stream
     // fn decode_eof(&mut self, buf: &mut BytesMut) -> Result<Option<Self::Item>> {
     //     match self.decode(buf)? {

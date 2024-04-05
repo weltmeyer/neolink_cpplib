@@ -248,7 +248,7 @@ impl Discoverer {
         tokio::select! {
             v = async {
                 loop {
-                    let (reply, addr) = reply.next().await.ok_or(Error::ConnectionUnavaliable)??;
+                    let (reply, addr) = reply.next().await.ok_or(Error::ConnectionUnavailable)??;
                     if let Some(result) = map(reply, addr) {
                         return Ok(result);
                     }

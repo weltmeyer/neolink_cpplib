@@ -104,7 +104,7 @@ pub(crate) async fn main(_opt: Opt, reactor: NeoReactor) -> Result<()> {
                 loop {
                     thread_config.changed().await?;
                     if let Err(e) = thread_rtsp.set_up_tls(&thread_config.borrow().clone()) {
-                        log::error!("Could not seup TLS: {e}");
+                        log::error!("Could not setup TLS: {e}");
                     }
                 }
             } => v
@@ -128,7 +128,7 @@ pub(crate) async fn main(_opt: Opt, reactor: NeoReactor) -> Result<()> {
 
                     let config = thread_config.borrow().clone();
                     if let Err(e) = apply_users(&thread_rtsp, &curr_users).await {
-                        log::error!("Could not seup TLS: {e}");
+                        log::error!("Could not setup TLS: {e}");
                     }
 
                     if config.certificate.is_none() && !curr_users.is_empty() {
@@ -186,7 +186,7 @@ pub(crate) async fn main(_opt: Opt, reactor: NeoReactor) -> Result<()> {
 
                     for (running_name, token) in cameras.iter() {
                         if ! config_names.contains(running_name) {
-                            log::debug!("Rtsp::main Cancel1");
+                            log::debug!("Rtsp::main Cancel!");
                             token.cancel();
                         }
                     }

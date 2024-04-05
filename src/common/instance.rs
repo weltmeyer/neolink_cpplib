@@ -125,7 +125,7 @@ impl NeoInstance {
                             if let Err(e) = &r {
                                 log::debug!("- Task Result: {e:?}");
                             }
-                            if let Err(Some(neolink_core::Error::CameraServiceUnavaliable(400))) = r.as_ref().map_err(|e| e.downcast_ref::<neolink_core::Error>()) {
+                            if let Err(Some(neolink_core::Error::CameraServiceUnavailable(400))) = r.as_ref().map_err(|e| e.downcast_ref::<neolink_core::Error>()) {
                                 // Retryable without a reconnect
                                 // Usually occurs when camera is starting up
                                 // or the connection is initialising

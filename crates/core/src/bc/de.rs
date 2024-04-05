@@ -448,7 +448,7 @@ mod tests {
 
     #[test]
     // B800 seems to have a different header to the E1 and swann cameras
-    // the stream_type and message_num do not seem to set in the offical clients
+    // the stream_type and message_num do not seem to set in the official clients
     //
     // They also have extra streams
     fn test_bc_b800_externstream() {
@@ -492,7 +492,7 @@ mod tests {
 
     #[test]
     // B800 seems to have a different header to the E1 and swann cameras
-    // the stream_type and message_num do not seem to set in the offical clients
+    // the stream_type and message_num do not seem to set in the official clients
     //
     // They also have extra streams
     fn test_bc_b800_substream() {
@@ -536,7 +536,7 @@ mod tests {
 
     #[test]
     // B800 seems to have a different header to the E1 and swann cameras
-    // the stream_type and message_num do not seem to set in the offical clients
+    // the stream_type and message_num do not seem to set in the official clients
     //
     // They also have extra streams
     fn test_bc_b800_mainstream() {

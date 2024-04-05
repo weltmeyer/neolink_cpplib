@@ -280,7 +280,7 @@ pub struct Extension {
     #[serde(rename = "binaryData", skip_serializing_if = "Option::is_none")]
     pub binary_data: Option<u32>,
     /// Certain requests such `AbilitySupport` require to know which user this
-    /// ability support request is for (why camera dosen't know this based on who
+    /// ability support request is for (why camera doesn't know this based on who
     /// is logged in is unknown... Possible security hole)
     #[serde(rename = "userName", skip_serializing_if = "Option::is_none")]
     pub user_name: Option<String>,
