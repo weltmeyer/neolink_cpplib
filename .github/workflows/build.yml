@@ -45,6 +45,10 @@ jobs:
           choco install -y --no-progress gstreamer --version=1.20.0
           choco install -y --no-progress gstreamer-devel --version=1.20.0
           $env:GSTREAMER_1_0_ROOT_MSVC_X86_64=$env:SYSTEMDRIVE + '\gstreamer\1.0\msvc_x86_64\'
+          # Github runners work on both C or D drive and figuring out which was used is difficult
+          if (-not (Test-Path -Path "$env:GSTREAMER_1_0_ROOT_MSVC_X86_64" -PathType Container)) {
+            $env:GSTREAMER_1_0_ROOT_MSVC_X86_64='D:\\gstreamer\1.0\msvc_x86_64\'
+          }
           echo "GSTREAMER_1_0_ROOT_MSVC_X86_64=$env:GSTREAMER_1_0_ROOT_MSVC_X86_64"
 
           # Proto buffers
@@ -53,8 +57,18 @@ jobs:
           # Open SSL
           choco install -y --no-progress openssl --version=1.1.1.2100
           $env:OPENSSL_DIR=$env:SYSTEMDRIVE + '\Program Files\OpenSSL-Win64\'
+
+          # Alternative openssl location (depends on version that gets installed by choco)
           if (-not (Test-Path -Path "$env:OPENSSL_DIR" -PathType Container)) {
             $env:OPENSSL_DIR=$env:SYSTEMDRIVE + '\Program Files\OpenSSL\'
+          }
+          # Github runners work on both C or D drive and figuring out which was used is difficult
+          if (-not (Test-Path -Path "$env:OPENSSL_DIR" -PathType Container)) {
+            $env:OPENSSL_DIR='D:\\Program Files\OpenSSL-Win64\'
+          }
+          # Or course we could be on alternative location and drive....
+          if (-not (Test-Path -Path "$env:OPENSSL_DIR" -PathType Container)) {
+            $env:OPENSSL_DIR='D:\\Program Files\OpenSSL\'
           }
 
           # Set github vars
