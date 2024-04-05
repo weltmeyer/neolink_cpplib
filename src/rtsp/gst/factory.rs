@@ -5,7 +5,6 @@
 
 use super::AnyResult;
 use gstreamer::glib::object_subclass;
-use gstreamer::glib::subclass::types::ObjectSubclass;
 use gstreamer::Element;
 use gstreamer::{
     glib::{self, Object},
@@ -36,7 +35,7 @@ impl Default for NeoMediaFactory {
 impl NeoMediaFactory {
     fn new() -> Self {
         let factory = Object::new::<NeoMediaFactory>();
-        factory.set_shared(false);
+        factory.set_shared(true);
         factory.set_eos_shutdown(false);
         factory.set_stop_on_disconnect(false);
         // factory.set_publish_clock_mode(gstreamer_rtsp_server::RTSPPublishClockMode::Clock);

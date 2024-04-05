@@ -405,7 +405,6 @@ impl BcCamera {
                 expected_stream_end += play_length;
             }
             let _ = sub.recv().await?;
-
         }
 
         // Chunks are still being played, while talk_stop will interrupt them. Wait until we expect

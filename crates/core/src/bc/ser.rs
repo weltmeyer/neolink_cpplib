@@ -1,5 +1,4 @@
 use super::model::*;
-use super::xml::BcPayloads;
 use super::xml_crypto;
 use cookie_factory::bytes::*;
 use cookie_factory::sequence::tuple;
@@ -92,6 +91,10 @@ fn bc_payload<W: Write>(
     let payload_bytes = match payload {
         BcPayloads::BcXml(x) => {
             let xml_bytes = x.serialize(vec![]).unwrap();
+            // log::debug!(
+            //     "Seialised as: {:?}",
+            //     std::str::from_utf8(xml_bytes.as_ref())
+            // );
             xml_crypto::encrypt(enc_offset, &xml_bytes, encryption_protocol)
         }
         BcPayloads::Binary(x) => x.to_owned(),

@@ -123,7 +123,7 @@ pub(crate) async fn main(_: Opt, reactor: NeoReactor) -> Result<()> {
                     config_names = thread_config.borrow().clone().cameras.iter().filter(|a| a.enabled).map(|cam_config| cam_config.name.clone()).collect::<HashSet<_>>();
 
                     for name in config_names.iter() {
-                        log::info!("{name}: MQTT Staring");
+                        log::info!("{name}: MQTT Starting");
                         if ! cameras.contains_key(name) {
                             let local_cancel = CancellationToken::new();
                             cameras.insert(name.clone(),local_cancel.clone());
@@ -565,7 +565,7 @@ async fn listen_on_camera(camera: NeoInstance, mqtt_instance: MqttInstance) -> R
                     } => v,
                     // Handle the floodlight task activation
                     v = async {
-                        let flt_status = camera_floodlight_tasks.run_task(|cam| Box::pin(async move {
+                        let flt_status = camera_floodlight_tasks.run_passive_task(|cam| Box::pin(async move {
                             Ok(cam.is_flightlight_tasks_enabled().await?)
                         })).await;
                         if flt_status.is_err() {
@@ -1156,9 +1156,11 @@ async fn handle_mqtt_message(
                     "FAIL"
                 }
                 Ok(xml) => {
-                    let bytes_res =
-                        yaserde::ser::serialize_with_writer(&xml, vec![], &Default::default());
-                    match bytes_res {
+                    let ser_xml = {
+                        let mut buf = bytes::BytesMut::new();
+                        quick_xml::se::to_writer(&mut buf, &xml).map(|_| buf.to_vec())
+                    };
+                    match ser_xml {
                         Ok(bytes) => match String::from_utf8(bytes) {
                             Ok(str) => {
                                 mqtt.send_message("status/battery", &str, false)
@@ -1200,9 +1202,11 @@ async fn handle_mqtt_message(
                     "FAIL"
                 }
                 Ok(xml) => {
-                    let bytes_res =
-                        yaserde::ser::serialize_with_writer(&xml, vec![], &Default::default());
-                    match bytes_res {
+                    let ser_xml = {
+                        let mut buf = bytes::BytesMut::new();
+                        quick_xml::se::to_writer(&mut buf, &xml).map(|_| buf.to_vec())
+                    };
+                    match ser_xml {
                         Ok(bytes) => match String::from_utf8(bytes) {
                             Ok(str) => {
                                 mqtt.send_message("status/pir", &str, false)
@@ -1245,9 +1249,11 @@ async fn handle_mqtt_message(
                     "FAIL"
                 }
                 Ok(xml) => {
-                    let bytes_res =
-                        yaserde::ser::serialize_with_writer(&xml, vec![], &Default::default());
-                    match bytes_res {
+                    let ser_xml = {
+                        let mut buf = bytes::BytesMut::new();
+                        quick_xml::se::to_writer(&mut buf, &xml).map(|_| buf.to_vec())
+                    };
+                    match ser_xml {
                         Ok(bytes) => match String::from_utf8(bytes) {
                             Ok(str) => {
                                 mqtt.send_message("status/ptz", &str, false)
