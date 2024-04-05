@@ -1,4 +1,4 @@
-use super::bc::model::Bc;
+use super::bc::model::{Bc, BcXml};
 use crate::NomErrorType;
 use thiserror::Error;
 
@@ -31,6 +31,15 @@ pub enum Error {
     UnintelligibleReply {
         /// The Bc packet that was not understood
         reply: std::sync::Arc<Box<Bc>>,
+        /// The message attached to the error
+        why: &'static str,
+    },
+
+    /// Raised when a BcXml reply was not understood
+    #[error("Communication error")]
+    UnintelligibleXml {
+        /// The Bc packet that was not understood
+        reply: std::sync::Arc<Box<BcXml>>,
         /// The message attached to the error
         why: &'static str,
     },

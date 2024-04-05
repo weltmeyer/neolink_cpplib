@@ -74,11 +74,11 @@ fn udp_disc(buf: &[u8]) -> IResult<&[u8], UdpDiscovery> {
     assert_eq!(checksum, actual_checksum);
 
     let decrypted_payload = decrypt(tid, enc_data_slice);
-    log::error!(
-        "decrypted_payload: {:?}",
-        std::str::from_utf8(&decrypted_payload)
-    );
     let payload = UdpXml::try_parse(decrypted_payload.as_slice()).map_err(|e| {
+        log::error!(
+            "decrypted_payload: {:?}",
+            std::str::from_utf8(&decrypted_payload)
+        );
         log::error!("e: {:?}", e);
         Err::Error(make_error(
             buf,
