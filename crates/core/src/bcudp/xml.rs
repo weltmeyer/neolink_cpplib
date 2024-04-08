@@ -146,7 +146,7 @@ pub struct ClientList {
 pub struct D2cCr {
     /// Called timer but not sure what it is a timer of
     pub timer: Timer,
-    /// Unknown
+    /// Unknown seems to be 0 on success and -3 on fail
     pub rsp: u32,
     /// Client ID
     pub cid: i32,
@@ -237,13 +237,17 @@ pub struct C2mQ {
 #[derive(PartialEq, Eq, Default, Debug, Deserialize, Serialize, Clone)]
 pub struct M2cQr {
     /// The register server location
-    pub reg: IpPort,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub reg: Option<IpPort>,
     /// The relay server location
-    pub relay: IpPort,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub relay: Option<IpPort>,
     /// The log server location
-    pub log: IpPort,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub log: Option<IpPort>,
     /// The camera location
-    pub t: IpPort,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub t: Option<IpPort>,
 }
 
 /// Used as part of M2C_Q_R to provide the host and port
@@ -328,11 +332,14 @@ pub struct R2cCr {
     /// The location of the relay
     #[serde(skip_serializing_if = "Option::is_none")]
     pub relay: Option<IpPort>,
+    /// The location of the relayt (not sure what the t is for)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub relayt: Option<IpPort>,
     /// The nat type. Known values `"NULL"`
     pub nat: String,
-    /// The camera SID
-    pub sid: u32,
-    /// rsp. Known values `0`
+    /// The camera SID, missing when rsp is `-3`
+    pub sid: Option<u32>,
+    /// rsp. Known values `0`, `-3, seems to be 0 on success and -3 on fail`
     pub rsp: i32,
     /// ac. Known values. `127536491`
     pub ac: u32,
@@ -347,7 +354,7 @@ pub struct D2cCfm {
     pub sid: u32,
     /// Type of connection observed values are `"local"`
     pub conn: String,
-    /// Unknown known values are `0`
+    /// Unknown known values are `0`, `-3, seems to be 0 on success and -3 on fail`
     pub rsp: u32,
     /// The client connection ID
     pub cid: i32,
@@ -366,7 +373,7 @@ pub struct C2rCfm {
     pub sid: u32,
     /// Type of connection observed values are `"local"`
     pub conn: String,
-    /// Unknown known values are `0`
+    /// Unknown known values are  `0`, `-3, seems to be 0 on success and -3 on fail`
     pub rsp: u32,
     /// The client connection ID
     pub cid: i32,

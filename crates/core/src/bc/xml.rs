@@ -114,6 +114,24 @@ pub struct BcXml {
     /// Play a sound
     #[serde(rename = "audioPlayInfo", skip_serializing_if = "Option::is_none")]
     pub audio_play_info: Option<AudioPlayInfo>,
+    /// For changing baichaun server port
+    #[serde(rename = "ServerPort", skip_serializing_if = "Option::is_none")]
+    pub server_port: Option<ServerPort>,
+    /// For changing http server port
+    #[serde(rename = "HttpPort", skip_serializing_if = "Option::is_none")]
+    pub http_port: Option<HttpPort>,
+    /// For changing https server port
+    #[serde(rename = "HttpsPort", skip_serializing_if = "Option::is_none")]
+    pub https_port: Option<HttpsPort>,
+    /// For changing rtsp server port
+    #[serde(rename = "RtspPort", skip_serializing_if = "Option::is_none")]
+    pub rtsp_port: Option<RtspPort>,
+    /// For changing rtmp server port
+    #[serde(rename = "RtmpPort", skip_serializing_if = "Option::is_none")]
+    pub rtmp_port: Option<RtmpPort>,
+    /// For changing rtmp server port
+    #[serde(rename = "OnvifPort", skip_serializing_if = "Option::is_none")]
+    pub onvif_port: Option<OnvifPort>,
 }
 
 impl BcXml {
@@ -1371,6 +1389,90 @@ pub struct AudioPlayInfo {
     /// On or Off: 0
     #[serde(rename = "onOff")]
     pub on_off: u32,
+}
+
+/// Server port for baichaun defaults 9000
+#[derive(PartialEq, Eq, Default, Debug, Deserialize, Serialize)]
+pub struct ServerPort {
+    /// XML Version
+    #[serde(rename = "@version")]
+    pub version: String,
+    /// The port number
+    #[serde(rename = "serverPort")]
+    pub port: u32,
+    /// The enable status known values are `1`, `0`
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub enable: Option<u32>,
+}
+
+/// Server port for http defaults to 80
+#[derive(PartialEq, Eq, Default, Debug, Deserialize, Serialize)]
+pub struct HttpPort {
+    /// XML Version
+    #[serde(rename = "@version")]
+    pub version: String,
+    /// The port number
+    #[serde(rename = "httpPort")]
+    pub port: u32,
+    /// The enable status known values are `1`, `0`
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub enable: Option<u32>,
+}
+
+/// Server port for https defaults to 443
+#[derive(PartialEq, Eq, Default, Debug, Deserialize, Serialize)]
+pub struct HttpsPort {
+    /// XML Version
+    #[serde(rename = "@version")]
+    pub version: String,
+    /// The port number
+    #[serde(rename = "httpsPort")]
+    pub port: u32,
+    /// The enable status known values are `1`, `0`
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub enable: Option<u32>,
+}
+
+/// Server port for Rtsp defaults to 554
+#[derive(PartialEq, Eq, Default, Debug, Deserialize, Serialize)]
+pub struct RtspPort {
+    /// XML Version
+    #[serde(rename = "@version")]
+    pub version: String,
+    /// The port number
+    #[serde(rename = "rtspPort")]
+    pub port: u32,
+    /// The enable status known values are `1`, `0`
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub enable: Option<u32>,
+}
+
+/// Server port for Rtmp defaults to 1935
+#[derive(PartialEq, Eq, Default, Debug, Deserialize, Serialize)]
+pub struct RtmpPort {
+    /// XML Version
+    #[serde(rename = "@version")]
+    pub version: String,
+    /// The port number
+    #[serde(rename = "rtmpPort")]
+    pub port: u32,
+    /// The enable status known values are `1`, `0`, can be `None` on cameras that can't change it
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub enable: Option<u32>,
+}
+
+/// Server port for Onvif defaults to 8000
+#[derive(PartialEq, Eq, Default, Debug, Deserialize, Serialize)]
+pub struct OnvifPort {
+    /// XML Version
+    #[serde(rename = "@version")]
+    pub version: String,
+    /// The port number
+    #[serde(rename = "onvifPort")]
+    pub port: u32,
+    /// The enable status known values are `1`, `0`
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub enable: Option<u32>,
 }
 
 /// Convience function to return the xml version used throughout the library

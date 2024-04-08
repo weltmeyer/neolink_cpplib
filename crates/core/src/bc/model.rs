@@ -31,6 +31,10 @@ pub const MSG_ID_REBOOT: u32 = 23;
 pub const MSG_ID_MOTION_REQUEST: u32 = 31;
 /// Motion detection messages
 pub const MSG_ID_MOTION: u32 = 33;
+/// Set service ports
+pub const MSG_ID_SET_SERVICE_PORTS: u32 = 36;
+/// Get service ports
+pub const MSG_ID_GET_SERVICE_PORTS: u32 = 37;
 /// Version messages have this ID
 pub const MSG_ID_VERSION: u32 = 80;
 /// Ping messages have this ID

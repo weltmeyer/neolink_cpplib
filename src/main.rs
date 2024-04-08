@@ -46,6 +46,7 @@ mod pir;
 mod ptz;
 mod reboot;
 mod rtsp;
+mod services;
 mod statusled;
 mod talk;
 mod utils;
@@ -121,6 +122,9 @@ async fn main() -> Result<()> {
         }
         Some(Command::Battery(opts)) => {
             battery::main(opts, neo_reactor.clone()).await?;
+        }
+        Some(Command::Services(opts)) => {
+            services::main(opts, neo_reactor.clone()).await?;
         }
     }
 

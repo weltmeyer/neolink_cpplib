@@ -421,19 +421,24 @@ impl Discoverer {
             }),
         };
         trace!("Sending look up {:?}", msg);
-        let (packet, _) = self
+        let (reg, relay, _) = self
             .retry_send(msg, addr, |bc, addr| match bc {
                 UdpDiscovery {
                     tid: _,
-                    payload: UdpXml::M2cQr(m2c_q_r),
-                } if valid_addr(&m2c_q_r.reg) => Some((m2c_q_r, addr)),
+                    payload:
+                        UdpXml::M2cQr(M2cQr {
+                            reg: Some(reg),
+                            relay: Some(relay),
+                            ..
+                        }),
+                } if valid_addr(&reg) && valid_addr(&relay) => Some((reg, relay, addr)),
                 _ => None,
             })
             .await?;
         trace!("Look up complete");
         Ok(UidLookupResults {
-            reg: SocketAddr::new(packet.reg.ip.parse()?, packet.reg.port),
-            relay: SocketAddr::new(packet.relay.ip.parse()?, packet.relay.port),
+            reg: SocketAddr::new(reg.ip.parse()?, reg.port),
+            relay: SocketAddr::new(relay.ip.parse()?, relay.port),
         })
     }
 
@@ -489,14 +494,15 @@ impl Discoverer {
                                 dmap,
                                 dev,
                                 relay,
-                                sid,
+                                sid: Some(sid),
                                 rsp,
                                 ..
                             }),
                     } if (dev.as_ref().map(valid_addr).unwrap_or(false)
                         || dmap.as_ref().map(valid_addr).unwrap_or(false)
                         || relay.as_ref().map(valid_addr).unwrap_or(false))
-                        && rsp != -1 =>
+                        && rsp != -1
+                        && rsp != -3 =>
                     {
                         Some(Ok((sid, dev, dmap, relay)))
                     }
@@ -544,7 +550,7 @@ impl Discoverer {
                     } if (dev.as_ref().map(valid_addr).unwrap_or(false)
                         || dmap.as_ref().map(valid_addr).unwrap_or(false)
                         || relay.as_ref().map(valid_addr).unwrap_or(false))
-                        && rsp == -1 =>
+                        && (rsp == -1 || rsp == -3) =>
                     {
                         Some(Err(Error::RegisterError))
                     }
