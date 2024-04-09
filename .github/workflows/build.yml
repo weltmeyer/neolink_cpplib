@@ -116,7 +116,7 @@ jobs:
           echo "GSTREAMER_1_0_ROOT_MSVC_X86_64=${GSTREAMER_1_0_ROOT_MSVC_X86_64}"
           echo "PKG_CONFIG_PATH=${PKG_CONFIG_PATH}"
           # pkg-config --variable pc_path pkg-config
-          cargo  build --debug --all-features
+          cargo  build --all-features
       - uses: actions/upload-artifact@v3
         with:
           name: debug-${{ matrix.os }}
@@ -182,7 +182,7 @@ jobs:
           TARGET: ${{ matrix.target }}
       - name: Build
         run: |
-          cargo build --verbose --debug --all-features --target=${TARGET}
+          cargo build --verbose --all-features --target=${TARGET}
         env:
           # Retarget pkg-config as described in https://www.freedesktop.org/wiki/Software/pkg-config/CrossCompileProposal/
           PKG_CONFIG_ALLOW_CROSS: 1
