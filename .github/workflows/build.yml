@@ -329,8 +329,8 @@ jobs:
         env:
           DOCKER_BUILDKIT: 1
 
-  create_debug:
-    name: Create debug
+  create_release:
+    name: Create Release
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/') && github.event_name == 'push' # Ensure this only runs on a tag or expect issues
     needs:
@@ -385,7 +385,7 @@ jobs:
         with:
           name: debug-i386-bookworm
           path: neolink_linux_i386
-      - name: Prepare debugs
+      - name: Prepare releases
         run: |
           dirs=(
             neolink_windows
@@ -400,8 +400,8 @@ jobs:
             chmod +x "${d}/neolink"*
             zip -r "${d}.zip" "${d}"
           done
-      - name: debug
-        uses: softprops/action-gh-debug@v1
+      - name: release
+        uses: softprops/action-gh-release@v1
         with:
           name: Neolink ${{steps.toml.outputs.version}}
           files: |
@@ -413,6 +413,6 @@ jobs:
             neolink_linux_arm64.zip
             neolink_linux_i386.zip
           body: |
-            Neolink debug ${{steps.toml.outputs.version}}
+            Neolink release ${{steps.toml.outputs.version}}
           draft: true
-          predebug: ${{ contains(github.ref_name,  'rc') }}
+          prerelease: ${{ contains(github.ref_name,  'rc') }}
