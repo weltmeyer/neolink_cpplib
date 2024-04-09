@@ -116,11 +116,11 @@ jobs:
           echo "GSTREAMER_1_0_ROOT_MSVC_X86_64=${GSTREAMER_1_0_ROOT_MSVC_X86_64}"
           echo "PKG_CONFIG_PATH=${PKG_CONFIG_PATH}"
           # pkg-config --variable pc_path pkg-config
-          cargo  build --release --all-features
+          cargo  build --debug --all-features
       - uses: actions/upload-artifact@v3
         with:
-          name: release-${{ matrix.os }}
-          path: "target/release/neolink*"
+          name: debug-${{ matrix.os }}
+          path: "target/debug/neolink*"
   cross:
     needs: pre_job
     if: needs.pre_job.outputs.should_skip != 'true'
@@ -182,7 +182,7 @@ jobs:
           TARGET: ${{ matrix.target }}
       - name: Build
         run: |
-          cargo build --verbose --release --all-features --target=${TARGET}
+          cargo build --verbose --debug --all-features --target=${TARGET}
         env:
           # Retarget pkg-config as described in https://www.freedesktop.org/wiki/Software/pkg-config/CrossCompileProposal/
           PKG_CONFIG_ALLOW_CROSS: 1
@@ -190,8 +190,8 @@ jobs:
           TARGET: ${{ matrix.target }}
       - uses: actions/upload-artifact@v3
         with:
-          name: release-${{ matrix.arch }}-bookworm
-          path: "target/${{ matrix.target }}/release/neolink*"
+          name: debug-${{ matrix.arch }}-bookworm
+          path: "target/${{ matrix.target }}/debug/neolink*"
 
   push_to_registry:
     name: Build Docker image
@@ -299,22 +299,22 @@ jobs:
       - name: Download Linux x86_64
         uses: actions/download-artifact@v3
         with:
-          name: release-amd64-bookworm
+          name: debug-amd64-bookworm
           path: linux/amd64
       - name: Download Linux armv7
         uses: actions/download-artifact@v3
         with:
-          name: release-armhf-bookworm
+          name: debug-armhf-bookworm
           path: linux/arm/v7
       - name: Download Linux arm64
         uses: actions/download-artifact@v3
         with:
-          name: release-arm64-bookworm
+          name: debug-arm64-bookworm
           path: linux/arm64
       - name: Download Linux i386
         uses: actions/download-artifact@v3
         with:
-          name: release-i386-bookworm
+          name: debug-i386-bookworm
           path: linux/386
       - name: Push to Docker Hub
         if: ${{ steps.vars.outputs.HAS_SECRET_TOKEN }}
@@ -329,8 +329,8 @@ jobs:
         env:
           DOCKER_BUILDKIT: 1
 
-  create_release:
-    name: Create Release
+  create_debug:
+    name: Create debug
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/') && github.event_name == 'push' # Ensure this only runs on a tag or expect issues
     needs:
@@ -353,39 +353,39 @@ jobs:
       - name: Download Windows
         uses: actions/download-artifact@v3
         with:
-          name: release-windows-2022
+          name: debug-windows-2022
           path: neolink_windows
       - name: Download Macos
         uses: actions/download-artifact@v3
         with:
-          name: release-macos-12
+          name: debug-macos-12
           path: neolink_macos
       - name: Download Linux x86_64
         uses: actions/download-artifact@v3
         with:
-          name: release-ubuntu-22.04
+          name: debug-ubuntu-22.04
           path: neolink_linux_x86_64_ubuntu
       - name: Download Linux x86_64
         uses: actions/download-artifact@v3
         with:
-          name: release-amd64-bookworm
+          name: debug-amd64-bookworm
           path: neolink_linux_x86_64_bookworm
       - name: Download Linux armhf
         uses: actions/download-artifact@v3
         with:
-          name: release-armhf-bookworm
+          name: debug-armhf-bookworm
           path: neolink_linux_armhf
       - name: Download Linux arm64
         uses: actions/download-artifact@v3
         with:
-          name: release-arm64-bookworm
+          name: debug-arm64-bookworm
           path: neolink_linux_arm64
       - name: Download Linux i386
         uses: actions/download-artifact@v3
         with:
-          name: release-i386-bookworm
+          name: debug-i386-bookworm
           path: neolink_linux_i386
-      - name: Prepare Releases
+      - name: Prepare debugs
         run: |
           dirs=(
             neolink_windows
@@ -400,8 +400,8 @@ jobs:
             chmod +x "${d}/neolink"*
             zip -r "${d}.zip" "${d}"
           done
-      - name: Release
-        uses: softprops/action-gh-release@v1
+      - name: debug
+        uses: softprops/action-gh-debug@v1
         with:
           name: Neolink ${{steps.toml.outputs.version}}
           files: |
@@ -413,6 +413,6 @@ jobs:
             neolink_linux_arm64.zip
             neolink_linux_i386.zip
           body: |
-            Neolink Release ${{steps.toml.outputs.version}}
+            Neolink debug ${{steps.toml.outputs.version}}
           draft: true
-          prerelease: ${{ contains(github.ref_name,  'rc') }}
+          predebug: ${{ contains(github.ref_name,  'rc') }}

@@ -13,10 +13,10 @@ COPY . /usr/local/src/neolink
 
 # Build the main program or copy from artifact
 #
-# We prefer building from artifact to reduce
+# We prefer copying from artifact to reduce
 # build time on the github runners
 #
-# Because of this through, during normal
+# Because of this though, during normal
 # github runner ops we are not testing the
 # docker to see if it will build from scratch
 # so if it is failing please make a PR
@@ -70,7 +70,8 @@ RUN apt-get update && \
         gstreamer1.0-plugins-base \
         gstreamer1.0-plugins-good \
         gstreamer1.0-plugins-bad \
-        gstreamer1.0-libav && \
+        gstreamer1.0-libav \
+        valgrind && \
     apt-get clean -y && rm -rf /var/lib/apt/lists/*
 
 COPY --from=build \
@@ -81,10 +82,12 @@ COPY docker/entrypoint.sh /entrypoint.sh
 RUN gst-inspect-1.0; \
     chmod +x "/usr/local/bin/neolink" && \
     "/usr/local/bin/neolink" --version && \
-    mkdir -m 0700 /root/.config/ # Location that the push notifications are cached to
+    mkdir -m 0700 /root/.config/ && \
+    mkdir -m 0700 /valgrind/
+
 
 ENV NEO_LINK_MODE="rtsp" NEO_LINK_PORT=8554
 
-CMD /usr/local/bin/neolink ${NEO_LINK_MODE} --config /etc/neolink.toml
+CMD valgrind --tool=massif --massif-out-file=/valgrind/massif.out /usr/local/bin/neolink ${NEO_LINK_MODE} --config /etc/neolink.toml
 ENTRYPOINT ["/entrypoint.sh"]
 EXPOSE ${NEO_LINK_PORT}
