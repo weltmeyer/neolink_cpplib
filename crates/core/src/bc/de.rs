@@ -150,6 +150,8 @@ fn bc_modern_msg<'a>(
     let payload;
     if payload_len > 0 {
         // Extract remainder of message as binary, if it exists
+        const UNENCRYPTED: EncryptionProtocol = EncryptionProtocol::Unencrypted;
+        const BC_ENCRYPTED: EncryptionProtocol = EncryptionProtocol::BCEncrypt;
         let encryption_protocol = match header {
             BcHeader {
                 msg_id: 1,
@@ -160,27 +162,27 @@ fn bc_modern_msg<'a>(
                 // Durig login, the max encryption is BcEncrypt since
                 // the nonce has not been exchanged yet
                 match response_code & 0xff {
-                    0x00 => EncryptionProtocol::Unencrypted,
-                    _ => EncryptionProtocol::BCEncrypt,
+                    0x00 => &UNENCRYPTED,
+                    _ => &BC_ENCRYPTED,
                 }
             }
             BcHeader { msg_id: 1, .. } => {
-                match *context.get_encrypted() {
-                    EncryptionProtocol::Aes(_) | EncryptionProtocol::FullAes(_) => {
+                match &context.get_encrypted() {
+                    EncryptionProtocol::Aes { .. } | EncryptionProtocol::FullAes { .. } => {
                         // During login max is BcEncrypt
-                        EncryptionProtocol::BCEncrypt
+                        &BC_ENCRYPTED
                     }
-                    n => n,
+                    n => *n,
                 }
             }
-            _ => *context.get_encrypted(),
+            _ => context.get_encrypted(),
         };
 
         let processed_payload_buf =
-            xml_crypto::decrypt(header.channel_id as u32, payload_buf, &encryption_protocol);
+            xml_crypto::decrypt(header.channel_id as u32, payload_buf, encryption_protocol);
         if context.in_bin_mode.contains(&(header.msg_num)) || in_binary {
             payload = match (context.get_encrypted(), encrypted_len) {
-                (EncryptionProtocol::FullAes(_), Some(encrypted_len)) => {
+                (EncryptionProtocol::FullAes { .. }, Some(encrypted_len)) => {
                     // if if context.debug {
                     //     log::trace!("Binary: {:X?}", &processed_payload_buf[0..30]);
                     // }
