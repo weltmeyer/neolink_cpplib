@@ -168,12 +168,12 @@ fn build_h264(bin: &Element, stream_config: &StreamConfig) -> Result<AppSrc> {
         .dynamic_cast::<AppSrc>()
         .map_err(|_| anyhow!("Cannot cast to appsrc."))?;
 
-    source.set_is_live(true);
+    source.set_is_live(false);
     source.set_block(false);
     source.set_min_latency(0);
     source.set_property("emit-signals", false);
     source.set_max_bytes(buffer_size as u64 * 3);
-    source.set_do_timestamp(true);
+    source.set_do_timestamp(false);
     source.set_stream_type(AppStreamType::Seekable);
 
     let source = source
@@ -203,12 +203,12 @@ fn build_h265(bin: &Element, stream_config: &StreamConfig) -> Result<AppSrc> {
     let source = make_element("appsrc", "vidsrc")?
         .dynamic_cast::<AppSrc>()
         .map_err(|_| anyhow!("Cannot cast to appsrc."))?;
-    source.set_is_live(true);
+    source.set_is_live(false);
     source.set_block(false);
     source.set_min_latency(0);
     source.set_property("emit-signals", false);
     source.set_max_bytes(buffer_size as u64 * 3);
-    source.set_do_timestamp(true);
+    source.set_do_timestamp(false);
     source.set_stream_type(AppStreamType::Seekable);
 
     let source = source
@@ -239,12 +239,12 @@ fn build_aac(bin: &Element, stream_config: &StreamConfig) -> Result<AppSrc> {
         .dynamic_cast::<AppSrc>()
         .map_err(|_| anyhow!("Cannot cast to appsrc."))?;
 
-    source.set_is_live(true);
+    source.set_is_live(false);
     source.set_block(false);
     source.set_min_latency(0);
     source.set_property("emit-signals", false);
     source.set_max_bytes(buffer_size as u64 * 3);
-    source.set_do_timestamp(true);
+    source.set_do_timestamp(false);
     source.set_stream_type(AppStreamType::Seekable);
 
     let source = source
@@ -311,12 +311,12 @@ fn build_adpcm(bin: &Element, block_size: u32, stream_config: &StreamConfig) -> 
     let source = make_element("appsrc", "audsrc")?
         .dynamic_cast::<AppSrc>()
         .map_err(|_| anyhow!("Cannot cast to appsrc."))?;
-    source.set_is_live(true);
+    source.set_is_live(false);
     source.set_block(false);
     source.set_min_latency(0);
     source.set_property("emit-signals", false);
     source.set_max_bytes(buffer_size as u64 * 3);
-    source.set_do_timestamp(true);
+    source.set_do_timestamp(false);
     source.set_stream_type(AppStreamType::Seekable);
 
     source.set_caps(Some(

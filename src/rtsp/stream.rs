@@ -2,7 +2,7 @@ use anyhow::{anyhow, Result};
 use gstreamer::{prelude::*, ClockTime, FlowError};
 use gstreamer_app::AppSrc;
 use gstreamer_rtsp_server::prelude::*;
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 use tokio::{
     sync::{broadcast::channel as broadcast, watch::channel as watch},
@@ -12,7 +12,7 @@ use tokio::{
 use tokio_stream::{wrappers::BroadcastStream, Stream, StreamExt};
 use tokio_util::sync::CancellationToken;
 
-use crate::common::{Permit, StampedData, UseCounter};
+use crate::common::{Permit, StampedData, UseCounter, VidFormat};
 use crate::{
     common::{NeoInstance, StreamConfig, StreamInstance},
     AnyResult,
@@ -428,6 +428,7 @@ async fn stream_run(
         let vid_data_rx = BroadcastStream::new(vid_data_rx).filter(|f| f.is_ok()); // Filter to ignore lagged
         let thread_vid = vid.clone();
         let mut thread_client_count = client_count.subscribe();
+        let thread_format = stream_config.vid_format;
         log::debug!("stream_config.fps: {}", stream_config.fps);
         // let fallback_time = Duration::from_secs(3);
         let framerate =
@@ -440,7 +441,7 @@ async fn stream_run(
                         AnyResult::Ok(())
                     },
                     v = send_to_appsrc(
-                        // repeat_keyframe(
+                        pad_vid(
                             frametime_stream(
                                 ensure_order(
                                     wait_for_keyframe(
@@ -449,10 +450,10 @@ async fn stream_run(
                                 ),
                                 framerate
                             ),
-                        //     fallback_time,
-                        //     framerate,
-                        // ),
-                        &thread_vid) => {
+                            thread_format,
+                        ),
+                        &thread_vid
+                    ) => {
                         v
                     },
                 };
@@ -625,6 +626,66 @@ fn frametime_stream<E, T: Stream<Item = Result<StampedData, E>> + Unpin>(
     })
 }
 
+fn h265_filler(size: usize) -> Vec<u8> {
+    assert!(size >= 6);
+    let mut buf = vec![0x0, 0x0, 0x1, 0b01001100, 0x0];
+    buf.resize(size, 0xFF);
+    buf[size - 1] = 0x80;
+    buf
+}
+
+fn h264_filler(size: usize) -> Vec<u8> {
+    assert!(size >= 5);
+    let mut buf = vec![0x0, 0x0, 0x1, 0xC];
+    buf.resize(size, 0xFF);
+    buf[size - 1] = 0x80;
+    buf
+}
+
+/// Takes a stream and pads it with filler blocks up to 4kb in h265 format
+fn pad_vid<E, T: Stream<Item = Result<StampedData, E>> + Unpin>(
+    mut stream: T,
+    format: VidFormat,
+) -> impl Stream<Item = AnyResult<StampedData>> + Unpin {
+    let min_pad: usize = match format {
+        VidFormat::H264 => 5,
+        VidFormat::H265 => 6,
+        VidFormat::None => unreachable!(),
+    };
+    Box::pin(async_stream::stream! {
+        while let Some(frame) = stream.next().await {
+            if let Ok(frame) = frame {
+                if (frame.data.len() % 4096) != 0 {
+                    let pad_size: usize = (frame.data.len() + min_pad).div_ceil(4096) * 4096 - frame.data.len();
+                    let frame = StampedData {
+                            keyframe: frame.keyframe,
+                            data: Arc::new(
+                                match format {
+                                    VidFormat::H264 => {
+                                        frame.data.iter().chain(
+                                            h264_filler(pad_size).iter()
+                                        ).copied().collect()
+                                    }
+                                    VidFormat::H265 => {
+                                        frame.data.iter().chain(
+                                            h265_filler(pad_size).iter()
+                                        ).copied().collect()
+                                    }
+                                    VidFormat::None => unreachable!(),
+                                }
+                            ),
+                            ts: frame.ts,
+                        };
+                    log::info!("pad_size: {}", frame.data.len());
+                    yield Ok(frame);
+                } else {
+                    yield Ok(frame);
+                }
+            }
+        }
+    })
+}
+
 #[allow(dead_code)]
 // This will take a stream and if there is a notibable lack of data
 // then it will repeat the last keyframe (if there have been no
@@ -689,6 +750,11 @@ async fn send_to_appsrc<E, T: Stream<Item = Result<StampedData, E>> + Unpin>(
 ) -> AnyResult<()> {
     let mut rt = Duration::ZERO;
     let mut wait_for_iframe = true;
+    let mut pools: HashMap<usize, gstreamer::BufferPool> = Default::default();
+    let mut dts: u64 = 0;
+    let mut buffer_inited = false;
+    appsrc.set_state(gstreamer::State::Paused).unwrap();
+
     while let Some(Ok(data)) = stream.next().await {
         check_live(appsrc)?; // Stop if appsrc is dropped
 
@@ -703,12 +769,28 @@ async fn send_to_appsrc<E, T: Stream<Item = Result<StampedData, E>> + Unpin>(
             rt = rt_i;
         }
         let buf = {
-            let mut gst_buf = gstreamer::Buffer::with_size(data.data.len()).unwrap();
+            // let mut gst_buf = pool.acquire_buffer(None).unwrap();
+            let msg_size = data.data.len();
+            let pool = pools.entry(msg_size).or_insert_with_key(|size| {
+                log::info!("new pool: {}", size);
+                let pool = gstreamer::BufferPool::new();
+                let mut pool_config = pool.config();
+                pool_config.set_params(None, (*size) as u32, 1, 8);
+                pool.set_config(pool_config).unwrap();
+                // let (allocator, alloc_parms) = pool.allocator().unwrap();
+                pool.set_active(true).unwrap();
+                log::info!("Options: {:?}", pool.options());
+                pool
+            });
+            log::info!("buffer size: {}", data.data.len());
+            let mut gst_buf = pool.acquire_buffer(None).unwrap();
+            // let mut gst_buf = gstreamer::Buffer::with_size(data.data.len()).unwrap();
             {
                 let gst_buf_mut = gst_buf.get_mut().unwrap();
                 // log::debug!("Setting PTS: {ts:?}, Runtime: {ts:?}");
                 let time = ClockTime::from_useconds(rt.as_micros() as u64);
-                gst_buf_mut.set_dts(time);
+                gst_buf_mut.set_dts(ClockTime::from_useconds(dts));
+                dts += 1;
                 gst_buf_mut.set_pts(time);
                 let mut gst_buf_data = gst_buf_mut.map_writable().unwrap();
                 gst_buf_data.copy_from_slice(data.data.as_slice());
@@ -727,6 +809,10 @@ async fn send_to_appsrc<E, T: Stream<Item = Result<StampedData, E>> + Unpin>(
             }
             Err(e) => Err(anyhow!("Error in streaming: {e:?}")),
         }?;
+        if !buffer_inited && appsrc.current_level_bytes() >= appsrc.max_bytes() {
+            appsrc.set_state(gstreamer::State::Playing).unwrap();
+            buffer_inited = true;
+        }
     }
     Ok(())
 }
