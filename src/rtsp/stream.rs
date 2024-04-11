@@ -775,7 +775,7 @@ async fn send_to_appsrc<E, T: Stream<Item = Result<StampedData, E>> + Unpin>(
                 log::info!("new pool: {}", size);
                 let pool = gstreamer::BufferPool::new();
                 let mut pool_config = pool.config();
-                pool_config.set_params(None, (*size) as u32, 1, 8);
+                pool_config.set_params(None, (*size) as u32, 8, 32);
                 pool.set_config(pool_config).unwrap();
                 // let (allocator, alloc_parms) = pool.allocator().unwrap();
                 pool.set_active(true).unwrap();
