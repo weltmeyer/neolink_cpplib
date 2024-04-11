@@ -1,5 +1,4 @@
 use super::model::*;
-use super::xml_crypto;
 use crate::Error;
 use bytes::{Buf, BytesMut};
 use log::*;
@@ -104,7 +103,7 @@ fn bc_modern_msg<'a>(
     let processed_ext_buf = match context.get_encrypted() {
         EncryptionProtocol::Unencrypted => ext_buf,
         encryption_protocol => {
-            decrypted = xml_crypto::decrypt(header.channel_id as u32, ext_buf, encryption_protocol);
+            decrypted = encryption_protocol.decrypt(header.channel_id as u32, ext_buf);
             &decrypted
         }
     };
@@ -179,7 +178,7 @@ fn bc_modern_msg<'a>(
         };
 
         let processed_payload_buf =
-            xml_crypto::decrypt(header.channel_id as u32, payload_buf, encryption_protocol);
+            encryption_protocol.decrypt(header.channel_id as u32, payload_buf);
         if context.in_bin_mode.contains(&(header.msg_num)) || in_binary {
             payload = match (context.get_encrypted(), encrypted_len) {
                 (EncryptionProtocol::FullAes { .. }, Some(encrypted_len)) => {
