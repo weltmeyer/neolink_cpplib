@@ -1,3 +1,4 @@
+use neolink_core::bc_protocol;
 pub use neolink_core::{
     //bc_protocol::{StreamOutput, StreamOutputError},
     bcmedia::model::*,
@@ -10,6 +11,8 @@ use neolink_core::bc_protocol::ConnectionProtocol;
 use neolink_core::bc_protocol::Credentials;
 use neolink_core::bc_protocol::DiscoveryMethods;
 use std::collections::HashMap;
+use std::fmt::Debug;
+use std::ptr::null;
 //use neolink_core::bc_protocol::{self, Stream};
 use lazy_static::lazy_static;
 use std::convert::TryInto;
@@ -103,13 +106,28 @@ pub extern "C" fn lib_cam_open(
         max_discovery_retries: 0,
     };
 
+    neolink_core::bc_protocol::Error::AuthFailed
     //let mut rt = Runtime::new().unwrap();
-    let mut camera: BcCamera = RT.block_on(async { BcCamera::new(&options).await}).unwrap();
+    let cameraResult: std::result::Result<BcCamera,neolink_core::bc_protocol::Error> = RT.block_on(async { BcCamera::new(&options).await});
+
+    match cameraResult{
+        Ok(camera)=>{
+            return Box::into_raw(Box::new(camera));
+        },
+        Err(error)=>{
+            //if(error==neolink_core::bc_protocol::Error.Io
+            //error.fmt(std::fmt::Display)
+            //error.
+            //return Box::into_raw(Box::new(None));
+            return std::ptr::null_mut();
+        }
+    }
+
     /*RT.block_on(async  {camera
         .login().await});*/
     
 
-    return Box::into_raw(Box::new(camera));
+    //return Box::into_raw(Box::new(camera));
 }
 
 ///starts camera stream main
@@ -241,7 +259,7 @@ pub extern "C" fn lib_cam_start_stream(
             .map_err(|e| println!("error:{}!", e))
             .ok();*/
 
-        println!("Run finished.");
+         log::debug!("Run finished.");
     //});
 }
 
@@ -251,7 +269,7 @@ pub extern "C" fn lib_cam_stop(ptr: *mut BcCamera) {
         assert!(!ptr.is_null());
         &mut *ptr
     };
-    println!("Shutdown...");
+    log::debug!("Shutdown...");
 
     //let mut rt = Runtime::new().unwrap();
     RT.block_on(
@@ -262,8 +280,8 @@ pub extern "C" fn lib_cam_stop(ptr: *mut BcCamera) {
     );
 
 
-    println!("Shutdown!");
-    println!("Join..");
+    log::debug!("Shutdown!");
+    log::debug!("Join..");
     let cam:&BcCamera = unsafe {
         assert!(!ptr.is_null());
         &*ptr
@@ -274,7 +292,7 @@ pub extern "C" fn lib_cam_stop(ptr: *mut BcCamera) {
             cam.join().await;
         }
     );
-    println!("Join!");
+    log::debug!("Join!");
 }
 
 pub fn string_from_c(s: *const c_char) -> String {
