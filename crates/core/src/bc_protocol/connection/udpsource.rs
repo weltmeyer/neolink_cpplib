@@ -518,6 +518,20 @@ impl UdpPayloadInner {
                 let (item, addr) = v.ok_or(Error::DroppedConnection)?;
                 if addr == camera_addr {
                     match item {
+                        BcUdp::Discovery(UdpDiscovery{
+                            payload: UdpXml::D2cHb(D2cHb {
+                                cid,
+                                did,
+                            }),
+                            ..
+                        }) => {
+                            if cid != self.client_id {
+                                log::info!("Camera sent different client ID in HB");
+                            }
+                            if did != self.camera_id {
+                                log::info!("Camera sent different device ID in HB");
+                            }
+                        },
                         BcUdp::Discovery(_disc) => {},
                         BcUdp::Ack(ack) => {
                             if ack.connection_id == self.client_id {

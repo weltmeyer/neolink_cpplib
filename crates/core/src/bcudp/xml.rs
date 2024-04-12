@@ -60,6 +60,9 @@ pub enum UdpXml {
     /// C2D_HB xml client to device heartbeat. This is the keep alive
     #[serde(rename = "C2R_HB")]
     C2rHb(C2rHb),
+    /// D2D_HB xml client to device heartbeat. This is the keep alive
+    #[serde(rename = "D2C_HB")]
+    D2cHb(D2cHb),
 }
 
 /// The top level holder for P2P we auto add/remove this at serde
@@ -419,6 +422,18 @@ pub struct C2dHb {
 pub struct C2rHb {
     /// The connection ID
     pub sid: u32,
+    /// The client connection ID
+    pub cid: i32,
+    /// The camera connection ID
+    pub did: i32,
+}
+
+/// D2C_HB xml
+///
+/// Device to client heart beat.
+/// Seems to act as a keep alive
+#[derive(PartialEq, Eq, Default, Debug, Deserialize, Serialize, Clone)]
+pub struct D2cHb {
     /// The client connection ID
     pub cid: i32,
     /// The camera connection ID

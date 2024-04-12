@@ -413,8 +413,8 @@ async fn stream_run(
         let mut thread_client_count = client_count.subscribe();
         let thread_format = stream_config.vid_format;
         // let fallback_time = Duration::from_secs(3);
-        let framerate =
-            Duration::from_millis(1000u64 / std::cmp::max(stream_config.fps as u64, 5u64));
+        // let framerate =
+        //     Duration::from_millis(1000u64 / std::cmp::max(stream_config.fps as u64, 5u64));
         if let Some(thread_vid) = thread_vid {
             set.spawn(async move {
                 thread_client_count.activate().await?;
@@ -424,14 +424,14 @@ async fn stream_run(
                     },
                     v = send_to_appsrc(
                         pad_vid(
-                            frametime_stream(
-                                ensure_order(
+                            // frametime_stream(
+                                // ensure_order(
                                     wait_for_keyframe(
                                         vid_data_rx,
-                                    )
-                                ),
-                                framerate
-                            ),
+                                    ),
+                                // ),
+                            //     framerate
+                            // ),
                             thread_format,
                         ),
                         &thread_vid
@@ -449,8 +449,8 @@ async fn stream_run(
         let thread_stream_cancel = stream_cancel.clone();
         let aud_data_rx = BroadcastStream::new(aud_data_rx).filter(|f| f.is_ok()); // Filter to ignore lagged
         let thread_aud = aud.clone();
-        let aud_framerate =
-            Duration::from_millis(1000u64 / std::cmp::max(stream_config.fps as u64, 5u64));
+        // let aud_framerate =
+        //     Duration::from_millis(1000u64 / std::cmp::max(stream_config.fps as u64, 5u64));
         if let Some(thread_aud) = thread_aud {
             set.spawn(async move {
                 let r = tokio::select! {
@@ -458,14 +458,14 @@ async fn stream_run(
                         AnyResult::Ok(())
                     },
                     v = send_to_appsrc(
-                        frametime_stream(
-                            ensure_order(
+                        // frametime_stream(
+                            // ensure_order(
                                 wait_for_keyframe(
                                     aud_data_rx
-                                )
-                            ),
-                            aud_framerate
-                        ), &thread_aud) => {
+                                ),
+                            // ),
+                            // aud_framerate),
+                        &thread_aud) => {
                         v
                     },
                 };
@@ -551,6 +551,7 @@ fn hold_stream<E, T: Stream<Item = Result<StampedData, E>> + Unpin>(
 // Take a stream of stamped data and reorder it
 // in case they are out of order
 // this also releases frames in waves of keyframe so it should replace `hold_stream`
+#[allow(dead_code)]
 fn ensure_order<E, T: Stream<Item = Result<StampedData, E>> + Unpin>(
     mut stream: T,
 ) -> impl Stream<Item = AnyResult<StampedData>> + Unpin {
@@ -565,6 +566,7 @@ fn ensure_order<E, T: Stream<Item = Result<StampedData, E>> + Unpin>(
                         reorder_buffer.push(frame_buffer.pop().unwrap());
                     }
                     frame_buffer.push(frame);
+
                     while let Some(frame) = reorder_buffer.pop() {
                         frame_buffer.push(frame);
                     }
@@ -582,6 +584,7 @@ fn ensure_order<E, T: Stream<Item = Result<StampedData, E>> + Unpin>(
 
 // Take a stream of stamped data pause until
 // it is time to display it
+#[allow(dead_code)]
 fn frametime_stream<E, T: Stream<Item = Result<StampedData, E>> + Unpin>(
     mut stream: T,
     expected_frame_rate: Duration,
@@ -719,9 +722,8 @@ async fn send_to_appsrc<E, T: Stream<Item = Result<StampedData, E>> + Unpin>(
     let mut rt = Duration::ZERO;
     let mut wait_for_iframe = true;
     let mut pools: HashMap<usize, gstreamer::BufferPool> = Default::default();
-    let mut dts: u64 = 0;
     let mut buffer_inited = false;
-    log::info!("Setting stream to pause");
+    let mut dts = 1;
     appsrc.set_state(gstreamer::State::Paused).unwrap();
 
     let (tx, mut rx) = tokio::sync::mpsc::channel::<StampedData>(2000);
@@ -744,17 +746,14 @@ async fn send_to_appsrc<E, T: Stream<Item = Result<StampedData, E>> + Unpin>(
                 // let mut gst_buf = pool.acquire_buffer(None).unwrap();
                 let msg_size = data.data.len();
                 let pool = pools.entry(msg_size).or_insert_with_key(|size| {
-                    log::info!("new pool: {}", size);
                     let pool = gstreamer::BufferPool::new();
                     let mut pool_config = pool.config();
                     pool_config.set_params(None, (*size) as u32, 8, 0);
                     pool.set_config(pool_config).unwrap();
                     // let (allocator, alloc_parms) = pool.allocator().unwrap();
                     pool.set_active(true).unwrap();
-                    log::info!("Options: {:?}", pool.options());
                     pool
                 });
-                log::info!("buffer size: {}", data.data.len());
                 let mut gst_buf = pool.acquire_buffer(None).unwrap();
                 // let mut gst_buf = gstreamer::Buffer::with_size(data.data.len()).unwrap();
                 {
@@ -781,15 +780,8 @@ async fn send_to_appsrc<E, T: Stream<Item = Result<StampedData, E>> + Unpin>(
                 Err(e) => Err(anyhow!("Error in streaming: {e:?}")),
             }?;
             if !buffer_inited && appsrc.current_level_bytes() >= appsrc.max_bytes() {
-                log::info!("Setting stream to play");
                 appsrc.set_state(gstreamer::State::Playing).unwrap();
                 buffer_inited = true;
-            } else {
-                log::info!(
-                    "Not yet ready: {}/{}",
-                    appsrc.current_level_bytes(),
-                    appsrc.max_bytes()
-                );
             }
         }
         AnyResult::Ok(())

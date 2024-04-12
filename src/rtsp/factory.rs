@@ -156,7 +156,11 @@ fn build_unknown(bin: &Element, pattern: &str) -> Result<()> {
 }
 
 fn build_h264(bin: &Element, stream_config: &StreamConfig) -> Result<AppSrc> {
-    let buffer_size = buffer_size(stream_config.bitrate / 10 / 8);
+    let buffer_size = buffer_size(stream_config.bitrate);
+    log::info!(
+        "buffer_size: {buffer_size}, bitrate: {}",
+        stream_config.bitrate
+    );
     let bin = bin
         .clone()
         .dynamic_cast::<Bin>()
@@ -179,10 +183,10 @@ fn build_h264(bin: &Element, stream_config: &StreamConfig) -> Result<AppSrc> {
         .map_err(|_| anyhow!("Cannot cast back"))?;
     let queue = make_queue("source_queue", buffer_size)?;
     let parser = make_element("h264parse", "parser")?;
-    let stamper = make_element("h264timestamper", "stamper")?;
+    // let stamper = make_element("h264timestamper", "stamper")?;
     let payload = make_element("rtph264pay", "pay0")?;
-    bin.add_many([&source, &queue, &parser, &stamper, &payload])?;
-    Element::link_many([&source, &queue, &parser, &stamper, &payload])?;
+    bin.add_many([&source, &queue, &parser, &payload])?;
+    Element::link_many([&source, &queue, &parser, &payload])?;
 
     let source = source
         .dynamic_cast::<AppSrc>()
@@ -191,7 +195,7 @@ fn build_h264(bin: &Element, stream_config: &StreamConfig) -> Result<AppSrc> {
 }
 
 fn build_h265(bin: &Element, stream_config: &StreamConfig) -> Result<AppSrc> {
-    let buffer_size = buffer_size(stream_config.bitrate / 8 / 10);
+    let buffer_size = buffer_size(stream_config.bitrate);
     let bin = bin
         .clone()
         .dynamic_cast::<Bin>()
@@ -213,10 +217,10 @@ fn build_h265(bin: &Element, stream_config: &StreamConfig) -> Result<AppSrc> {
         .map_err(|_| anyhow!("Cannot cast back"))?;
     let queue = make_queue("source_queue", buffer_size)?;
     let parser = make_element("h265parse", "parser")?;
-    let stamper = make_element("h265timestamper", "stamper")?;
+    // let stamper = make_element("h265timestamper", "stamper")?;
     let payload = make_element("rtph265pay", "pay0")?;
-    bin.add_many([&source, &queue, &parser, &stamper, &payload])?;
-    Element::link_many([&source, &queue, &parser, &stamper, &payload])?;
+    bin.add_many([&source, &queue, &parser, &payload])?;
+    Element::link_many([&source, &queue, &parser, &payload])?;
 
     let source = source
         .dynamic_cast::<AppSrc>()
@@ -224,8 +228,8 @@ fn build_h265(bin: &Element, stream_config: &StreamConfig) -> Result<AppSrc> {
     Ok(source)
 }
 
-fn build_aac(bin: &Element, stream_config: &StreamConfig) -> Result<AppSrc> {
-    let buffer_size = buffer_size(512 * 10);
+fn build_aac(bin: &Element, _stream_config: &StreamConfig) -> Result<AppSrc> {
+    let buffer_size = 512 * 6;
     let bin = bin
         .clone()
         .dynamic_cast::<Bin>()
@@ -289,8 +293,8 @@ fn build_aac(bin: &Element, stream_config: &StreamConfig) -> Result<AppSrc> {
     Ok(source)
 }
 
-fn build_adpcm(bin: &Element, block_size: u32, stream_config: &StreamConfig) -> Result<AppSrc> {
-    let buffer_size = buffer_size(512 * 6);
+fn build_adpcm(bin: &Element, block_size: u32, _stream_config: &StreamConfig) -> Result<AppSrc> {
+    let buffer_size = 512 * 6;
     let bin = bin
         .clone()
         .dynamic_cast::<Bin>()
@@ -442,5 +446,6 @@ fn make_queue(name: &str, buffer_size: u32) -> AnyResult<Element> {
 }
 
 fn buffer_size(bitrate: u32) -> u32 {
-    std::cmp::max(bitrate * 15u32 / 8u32, 4u32 * 1024u32 * 1024u32)
+    // 0.1 seconds (according to bitrate) or 4kb what ever is larger
+    std::cmp::max(bitrate / 10u32 / 8u32, 4u32 * 1024u32)
 }
