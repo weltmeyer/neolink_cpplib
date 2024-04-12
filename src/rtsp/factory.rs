@@ -156,7 +156,7 @@ fn build_unknown(bin: &Element, pattern: &str) -> Result<()> {
 }
 
 fn build_h264(bin: &Element, stream_config: &StreamConfig) -> Result<AppSrc> {
-    let buffer_size = buffer_size(stream_config.bitrate);
+    let buffer_size = buffer_size(stream_config.bitrate / 10);
     let bin = bin
         .clone()
         .dynamic_cast::<Bin>()
@@ -191,7 +191,7 @@ fn build_h264(bin: &Element, stream_config: &StreamConfig) -> Result<AppSrc> {
 }
 
 fn build_h265(bin: &Element, stream_config: &StreamConfig) -> Result<AppSrc> {
-    let buffer_size = buffer_size(stream_config.bitrate);
+    let buffer_size = buffer_size(stream_config.bitrate / 10);
     let bin = bin
         .clone()
         .dynamic_cast::<Bin>()
@@ -225,7 +225,7 @@ fn build_h265(bin: &Element, stream_config: &StreamConfig) -> Result<AppSrc> {
 }
 
 fn build_aac(bin: &Element, stream_config: &StreamConfig) -> Result<AppSrc> {
-    let buffer_size = buffer_size(stream_config.bitrate);
+    let buffer_size = buffer_size(512 * 10);
     let bin = bin
         .clone()
         .dynamic_cast::<Bin>()
@@ -290,7 +290,7 @@ fn build_aac(bin: &Element, stream_config: &StreamConfig) -> Result<AppSrc> {
 }
 
 fn build_adpcm(bin: &Element, block_size: u32, stream_config: &StreamConfig) -> Result<AppSrc> {
-    let buffer_size = buffer_size(stream_config.bitrate);
+    let buffer_size = buffer_size(512 * 6);
     let bin = bin
         .clone()
         .dynamic_cast::<Bin>()
