@@ -185,7 +185,6 @@ impl NeoCamStreamThread {
 
 impl Drop for NeoCamStreamThread {
     fn drop(&mut self) {
-        log::debug!("NeoCamStreamThread::drop Cancel");
         self.cancel.cancel();
         for stream in self.streams.values() {
             stream.cancel.cancel()
@@ -422,7 +421,6 @@ impl StreamData {
                         //
                         // This should stop one branch of the select from waking the other
                         // too often
-                        let watchdog_print_name = print_name.clone();
                         tokio::task::spawn(async move {
                             let mut check_timeout = timeout(Duration::from_secs(15), watchdog_rx.recv()).await; // Wait longer for the first feed
                             loop {
@@ -430,15 +428,12 @@ impl StreamData {
                                     Err(_) => {
                                         // Timeout
                                         // Break with Ok to trigger the restart
-                                        log::debug!("{watchdog_print_name}: Watchdog kicking the stream");
                                         break;
                                     },
                                     Ok(None) => {
-                                        log::debug!("{watchdog_print_name}: Watchdog dropped the stream");
                                         break;
                                     }
                                     Ok(_) => {
-                                        // log::debug!("{print_name}: Good Doggo");
                                         check_timeout = timeout(Duration::from_secs(10), watchdog_rx.recv()).await;
                                     }
                                 }
@@ -450,12 +445,10 @@ impl StreamData {
                         tokio::select! {
                             v = thread_inuse.dropped_users() => {
                                 // Handles the stop and restart when no active users
-                                log::debug!("{print_name}: Streaming STOP");
                                 permit.deactivate().await?;
                                 v?;
                                 thread_inuse.aquired_users().await?; // Wait for new users of the stream
                                 permit.activate().await?;
-                                log::debug!("{print_name}: Streaming START");
                                 AnyResult::Ok(())
                             },
                             _ = watchdog_eat_rx => {
@@ -470,9 +463,7 @@ impl StreamData {
                                     let aud_history = aud_history.clone();
                                     let watchdog_tx = watchdog_tx.clone();
                                     let fps_table = fps_table.clone();
-                                    let print_name = print_name.clone();
 
-                                    log::debug!("{print_name}: Running Stream Instance Task");
                                     Box::pin(async move {
                                         // use std::io::Write;
                                         // let mut file = std::fs::File::create("reference.h264")?;
@@ -483,11 +474,8 @@ impl StreamData {
                                             let mut prev_ts = Duration::ZERO;
                                             let mut stream_data = camera.start_video(name, 0, strict).await?;
                                             loop {
-                                                log::debug!("{print_name}:   Waiting for frame");
                                                 let data = stream_data.get_data().await??;
-                                                log::debug!("{print_name}:   Waiting for Watchdog");
                                                 watchdog_tx.send(()).await?;  // Feed the watchdog
-                                                log::debug!("{print_name}:   Got frame");
 
                                                 // Update the stream config with any information
                                                 match &data {
@@ -573,7 +561,6 @@ impl StreamData {
                                                 match data {
                                                     BcMedia::Iframe(BcMediaIframe{data, microseconds, ..}) => {
                                                         prev_ts = Duration::from_micros(microseconds as u64);
-                                                        // log::debug!("IFrame: {prev_ts:?}");
                                                         let d = StampedData{
                                                                 keyframe: true,
                                                                 data: Arc::new(data),
@@ -593,8 +580,6 @@ impl StreamData {
                                                     },
                                                     BcMedia::Pframe(BcMediaPframe{data, microseconds,..}) if recieved_iframe => {
                                                         prev_ts = Duration::from_micros(microseconds as u64);
-                                                        // log::debug!("PFrame: {prev_ts:?}");
-                                                        // log::debug!("data: {data:02X?}");
                                                         let d = StampedData{
                                                             keyframe: false,
                                                             data: Arc::new(data),
@@ -611,7 +596,6 @@ impl StreamData {
                                                         log::trace!("Sent Vid Frame");
                                                     }
                                                     BcMedia::Aac(BcMediaAac{data, ..}) | BcMedia::Adpcm(BcMediaAdpcm{data,..}) if recieved_iframe => {
-                                                        // log::debug!("Audio: {prev_ts:?}");
                                                         let d = StampedData{
                                                             keyframe: aud_keyframe,
                                                             data: Arc::new(data),
@@ -654,7 +638,6 @@ impl StreamData {
                     }
                 } => v,
             };
-            log::debug!("{print_name}: Stream Thead Stopped: {:?}", r);
             r
         }));
 
@@ -662,7 +645,6 @@ impl StreamData {
     }
 
     async fn shutdown(&mut self) -> Result<()> {
-        log::debug!("StreamData::shutdown Cancel");
         self.cancel.cancel();
         if let Some(handle) = self.handle.take() {
             let _ = handle.await;

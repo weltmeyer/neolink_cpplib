@@ -49,25 +49,17 @@ impl StreamData {
     pub async fn get_data(&mut self) -> Result<Result<BcMedia>> {
         if let Some(handle) = self.handle.as_mut() {
             if handle.is_finished() {
-                log::debug!("SteamData::get_data Cancel1");
                 self.abort_handle.cancel();
                 handle.await??;
                 return Err(Error::DroppedConnection);
             }
         } else {
-            log::debug!("SteamData::get_data Cancel2");
             self.abort_handle.cancel();
             return Err(Error::DroppedConnection);
         }
-        // debug!("StreamData: Get");
         match self.rx.recv().await {
-            Some(data) => {
-                // debug!("StreamData: Got");
-                Ok(data)
-            }
+            Some(data) => Ok(data),
             None => {
-                // debug!("StreamData: Drop");
-                log::debug!("SteamData::get_data Cancel3");
                 self.abort_handle.cancel();
                 Err(Error::DroppedConnection)
             }
@@ -77,7 +69,6 @@ impl StreamData {
     /// Attempts to gracefully shutdown this will cancel the background task and send
     /// the Stop command to the camera
     pub async fn shutdown(&mut self) -> Result<()> {
-        log::debug!("SteamData::shutdown Cancel");
         self.abort_handle.cancel();
         if let Some(handle) = self.handle.take() {
             let _ = handle.await?;
@@ -218,20 +209,15 @@ impl BcCamera {
                     _ = abort_handle_thread.cancelled() => {},
                     _ = async {
                         while let Some(bc_media) = media_sub.next().await {
-                            // debug!("Stream: Got");
                             // We now have a complete interesting packet. Send it to on the callback
-                            // debug!("Stream: Send");
                             if tx.send(bc_media).await.is_err() {
-                                // debug!("Stream: Dropped");
                                 break; // Connection dropped
                             }
-                            // debug!("Stream: Sent");
                         }
                     } => {}
                 }
             }
 
-            // debug!("Stream: Stopping");
             let stop_video = Bc::new_from_xml(
                 BcMeta {
                     msg_id: MSG_ID_VIDEO_STOP,
@@ -251,10 +237,8 @@ impl BcCamera {
                     ..Default::default()
                 },
             );
-            // debug!("Stream: Send Stop");
             let mut sub_stop = connection.subscribe(MSG_ID_VIDEO_STOP, msg_num).await?;
             sub_stop.send(stop_video).await?;
-            // debug!("Stream: Sent Stop");
 
             tokio::select! {
                 v = async {

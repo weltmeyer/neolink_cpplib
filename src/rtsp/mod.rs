@@ -186,7 +186,6 @@ pub(crate) async fn main(_opt: Opt, reactor: NeoReactor) -> Result<()> {
 
                     for (running_name, token) in cameras.iter() {
                         if ! config_names.contains(running_name) {
-                            log::debug!("Rtsp::main Cancel!");
                             token.cancel();
                         }
                     }
@@ -217,7 +216,6 @@ pub(crate) async fn main(_opt: Opt, reactor: NeoReactor) -> Result<()> {
                 // Panicked or error in task
                 // Cancel all and await terminate
                 log::error!("Error: {e}");
-                log::debug!("Rtsp::main Cancel2");
                 global_cancel.cancel();
                 rtsp.quit().await?;
             }
@@ -291,8 +289,6 @@ async fn camera_main(camera: NeoInstance, rtsp: &NeoRtspServer) -> Result<()> {
         AnyResult::Ok(())
     });
 
-    log::debug!("{name}: Camera Main::Loop");
-
     let mut camera_config = camera.config().await?.clone();
     loop {
         let prev_stream_config = camera_config.borrow_and_update().stream;
@@ -316,7 +312,6 @@ async fn camera_main(camera: NeoInstance, rtsp: &NeoRtspServer) -> Result<()> {
             },
             v = async {
                 // This select handles enabling the right stream
-                log::debug!("{name}: Camera Main::Select Stream");
                 // and setting up the users
                 let all_users = rtsp.get_users().await?.iter().filter(|a| *a != "anyone" && *a != "anonymous").cloned().collect::<HashSet<_>>();
                 let permitted_users: HashSet<String> = match &prev_stream_users {
@@ -340,7 +335,6 @@ async fn camera_main(camera: NeoInstance, rtsp: &NeoRtspServer) -> Result<()> {
                 let mut supported_streams_3 = supported_streams.clone();
                 tokio::select! {
                     v = async {
-                        log::debug!("{name}: Camera Main::Select Main");
                         let name = camera.config().await?.borrow().name.clone();
                         let mut paths = vec![
                             format!("/{name}/main"),
@@ -371,7 +365,6 @@ async fn camera_main(camera: NeoInstance, rtsp: &NeoRtspServer) -> Result<()> {
                         stream_main(camera.stream(StreamKind::Main).await?, camera.clone(), rtsp, &permitted_users, &paths).await
                     }, if active_streams.contains(&StreamKind::Main) => v,
                     v = async {
-                        log::debug!("{name}: Camera Main::Select Sub");
                         let name = camera.config().await?.borrow().name.clone();
                         let mut paths = vec![
                             format!("/{name}/sub"),
@@ -406,7 +399,6 @@ async fn camera_main(camera: NeoInstance, rtsp: &NeoRtspServer) -> Result<()> {
                         stream_main(camera.stream(StreamKind::Sub).await?,camera.clone(), rtsp, &permitted_users, &paths).await
                     }, if active_streams.contains(&StreamKind::Sub) => v,
                     v = async {
-                        log::debug!("{name}: Camera Main::Select Extern");
                         let name = camera.config().await?.borrow().name.clone();
                         let mut paths = vec![
                             format!("/{name}/extern"),

@@ -371,7 +371,6 @@ impl UdpPayloadInner {
                                         // Socket is (maybe) broken
                                         // Seems to happen with network reconnects like over
                                         // a lossy cellular network
-                                        log::debug!("Quick reconnect: Due to socket timeout");
                                         let stream = Arc::new(tokio::time::timeout(tokio::time::Duration::from_millis(250), connect_try_port(inner.inner.get_ref().local_addr()?.port())).await.map_err(|_| Error::DroppedConnection)??);
                                         inner = tokio::time::timeout(tokio::time::Duration::from_millis(250), BcUdpSource::new_from_socket(stream, inner.addr)).await.map_err(|_| Error::DroppedConnection)??;
 
@@ -401,7 +400,6 @@ impl UdpPayloadInner {
                     Ok(())
                 } => v,
             };
-            log::debug!("UdpPayloadInner::new SendToSocket Cancel: {:?}", result);
             send_cancel.cancel();
             result
         });

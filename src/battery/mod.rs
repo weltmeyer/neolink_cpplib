@@ -23,7 +23,6 @@ pub(crate) use cmdline::Opt;
 /// Opt is the command line options
 pub(crate) async fn main(opt: Opt, reactor: NeoReactor) -> Result<()> {
     let camera = reactor.get(&opt.camera).await?;
-    log::debug!("Battery: Instance aquired");
 
     let state = camera
         .run_task(|cam| {

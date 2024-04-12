@@ -43,27 +43,18 @@ pub(super) async fn stream_main(
         let this_loop_cancel = CancellationToken::new();
         let _drop_guard = this_loop_cancel.clone().drop_guard();
 
-        log::debug!("{}: Activating Stream", &name);
         stream_instance.activate().await?;
 
         // Wait for a valid stream format to be detected
-        log::debug!("{}: Waiting for Valid Stream", &name);
         stream_instance
             .config
-            .wait_for(|config| {
-                log::debug!("{:?}", config);
-                config.vid_ready()
-            })
+            .wait_for(|config| config.vid_ready())
             .await?;
-        log::debug!("{}: Waiting for Valid Audio", &name);
         // After vid give it 1s to look for audio
         // Ignore timeout but check err
         if let Ok(v) = tokio::time::timeout(
             Duration::from_secs(1),
-            stream_instance.config.wait_for(|config| {
-                log::debug!("{:?}", config);
-                config.aud_ready()
-            }),
+            stream_instance.config.wait_for(|config| config.aud_ready()),
         )
         .await
         {
@@ -83,7 +74,6 @@ pub(super) async fn stream_main(
         let pause_affector_tx = Arc::new(pause_affector_tx);
 
         let mut set = JoinSet::<AnyResult<()>>::new();
-        log::debug!("{}: Creating Client Counters", &name);
         // Handles the on off of the stream with the client pause
         let client_counter = UseCounter::new().await;
         let client_count = client_counter.create_deactivated().await?;
@@ -98,7 +88,6 @@ pub(super) async fn stream_main(
                 tokio::select! {
                     _ = cancel.cancelled() => AnyResult::Ok(()),
                     v = async {
-                        log::debug!("{}: Activating Client Pause", thread_name);
                         loop {
                             client_count.aquired_users().await?;
                             log::info!("{}: Enabling Client", thread_name);
@@ -130,7 +119,6 @@ pub(super) async fn stream_main(
                 tokio::select! {
                     _ = cancel.cancelled() => AnyResult::Ok(()),
                     v = async {
-                        log::debug!("{}: Activating Motion Pause", &thread_name);
                         loop {
                             motion
                                 .wait_for(|md| matches!(md, crate::common::MdState::Start(_)))
@@ -155,7 +143,6 @@ pub(super) async fn stream_main(
             });
 
             // Push notfications
-            log::debug!("{}: Activating Push Notification Pause", &name);
             let mut pn = camera.push_notifications().await?;
             let mut curr_pn = None;
             let thread_name = name.clone();
@@ -260,14 +247,12 @@ pub(super) async fn stream_main(
         let cancel = this_loop_cancel.clone();
         let counter = client_counter.create_deactivated().await?;
         let mut cur_count = 0;
-        let thread_name = name.clone();
         set.spawn(async move {
             tokio::select! {
                 _ = cancel.cancelled() => AnyResult::Ok(()),
                 v = async {
                     loop {
                         cur_count = *counter.get_counter().wait_for(|v| v != &cur_count).await?;
-                        log::debug!("{thread_name}: Number of rtsp clients: {cur_count}");
                     }
                 } => v,
             }
@@ -275,7 +260,6 @@ pub(super) async fn stream_main(
 
         // This runs the actual stream.
         // The select will restart if the stream's config updates
-        log::debug!("{}: Stream Activated", &name);
         break tokio::select! {
             v = thread_stream_config.wait_for(|new_conf| new_conf != &last_stream_config) => {
                 let v = v?;
@@ -330,7 +314,6 @@ async fn stream_run(
     let mut set = JoinSet::new();
     // Wait for new media client data to come in from the factory
     while let Some(mut client_data) = client_rx.recv().await {
-        log::debug!("New media");
         // New media created
         let vid = client_data.vid.take().map(|data| data.app);
         let aud = client_data.aud.take().map(|data| data.app);
@@ -429,7 +412,6 @@ async fn stream_run(
         let thread_vid = vid.clone();
         let mut thread_client_count = client_count.subscribe();
         let thread_format = stream_config.vid_format;
-        log::debug!("stream_config.fps: {}", stream_config.fps);
         // let fallback_time = Duration::from_secs(3);
         let framerate =
             Duration::from_millis(1000u64 / std::cmp::max(stream_config.fps as u64, 5u64));
@@ -459,7 +441,6 @@ async fn stream_run(
                 };
                 drop(thread_client_count);
                 let _ = thread_vid.end_of_stream();
-                log::debug!("Vid Thread End: {:?}", r);
                 r
             });
         }
@@ -489,12 +470,10 @@ async fn stream_run(
                     },
                 };
                 let _ = thread_aud.end_of_stream();
-                log::debug!("Aud Thread End: {:?}", r);
                 r
             });
         }
     }
-    log::debug!("Cleaning up streams");
     // At this point the factory has been destroyed
     // Cancel any remaining threads that are trying to send data
     // Although it should be finished already when the appsrcs are dropped
@@ -506,7 +485,6 @@ async fn stream_run(
 }
 
 fn check_live(app: &AppSrc) -> Result<()> {
-    // log::debug!("Checking Live: {:?}", app.bus());
     app.bus().ok_or(anyhow!("App source is closed"))?;
     app.pads()
         .iter()
@@ -518,11 +496,8 @@ fn check_live(app: &AppSrc) -> Result<()> {
 fn get_runtime(app: &AppSrc) -> Option<Duration> {
     if let Some(clock) = app.clock() {
         if let Some(time) = clock.time() {
-            // log::debug!("time: {time:?}");
             if let Some(base_time) = app.base_time() {
-                // log::debug!("base_time: {base_time:?}");
                 let runtime = time.saturating_sub(base_time);
-                // log::debug!("runtime: {runtime:?}");
                 return Some(Duration::from_micros(runtime.useconds()));
             }
         }
@@ -560,11 +535,9 @@ fn hold_stream<E, T: Stream<Item = Result<StampedData, E>> + Unpin>(
             if let Ok(frame) = frame {
                 if frame.keyframe {
                     // Release
-                    // log::debug!("Yielding: {}", held_frames.len());
                     for held_frame in held_frames.drain(..) {
                         yield Ok(held_frame);
                     }
-                    // log::debug!("Yielded");
                     yield Ok(frame);
                 } else {
                     //  Hold
@@ -589,7 +562,6 @@ fn ensure_order<E, T: Stream<Item = Result<StampedData, E>> + Unpin>(
                     // Buffer until keyframe and reorder
                     let mut reorder_buffer = vec![];
                     while frame_buffer.last().is_some_and(|v| v.ts > frame.ts) {
-                        log::debug!("Reorder: {:?}", frame.ts);
                         reorder_buffer.push(frame_buffer.pop().unwrap());
                     }
                     frame_buffer.push(frame);
@@ -642,7 +614,7 @@ fn h264_filler(size: usize) -> Vec<u8> {
     buf
 }
 
-/// Takes a stream and pads it with filler blocks up to 4kb in h265 format
+/// Takes a stream and pads it with filler blocks up to 4kb in h265 or h264 format
 fn pad_vid<E, T: Stream<Item = Result<StampedData, E>> + Unpin>(
     mut stream: T,
     format: VidFormat,
@@ -700,7 +672,6 @@ fn repeat_keyframe<E, T: Stream<Item = Result<StampedData, E>> + Unpin>(
         while let Some(frame) = stream.next().await {
             if let Ok(frame) = frame {
                 if frame.keyframe {
-                    // log::debug!("Key Frame");
                     let repeater = frame.clone();
                     yield Ok(frame);
 
@@ -712,7 +683,6 @@ fn repeat_keyframe<E, T: Stream<Item = Result<StampedData, E>> + Unpin>(
                                 if let Some(frame) = v {
                                     if let Ok(frame) = frame {
                                         if was_repeating {
-                                            log::debug!("Key Frame: Resume");
                                             was_repeating = false;
                                         }
                                         yield Ok(frame);
@@ -725,7 +695,6 @@ fn repeat_keyframe<E, T: Stream<Item = Result<StampedData, E>> + Unpin>(
                             _ = sleep(fallback_time) => {
                                 if !was_repeating {
                                     // This way we only print once
-                                    log::debug!("Inserting Skip Frames");
                                     was_repeating = true;
                                 }
                                 fallback_time = frame_rate;
@@ -787,7 +756,6 @@ async fn send_to_appsrc<E, T: Stream<Item = Result<StampedData, E>> + Unpin>(
             // let mut gst_buf = gstreamer::Buffer::with_size(data.data.len()).unwrap();
             {
                 let gst_buf_mut = gst_buf.get_mut().unwrap();
-                // log::debug!("Setting PTS: {ts:?}, Runtime: {ts:?}");
                 let time = ClockTime::from_useconds(rt.as_micros() as u64);
                 gst_buf_mut.set_dts(ClockTime::from_useconds(dts));
                 dts += 1;

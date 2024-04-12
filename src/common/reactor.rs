@@ -61,7 +61,6 @@ impl NeoReactor {
                         match command {
                             NeoReactorCommand::HangUp =>  {
                                 instances.clear();
-                                log::debug!("Cancel:: NeoReactorCommand::HangUp");
                                 cancel2.cancel();
                                 return Result::<(), anyhow::Error>::Ok(());
                             }
@@ -72,11 +71,9 @@ impl NeoReactor {
                                 let new = match instances.entry(name.clone()) {
                                     Entry::Occupied(occ) => Result::Ok(Some(occ.get().subscribe().await?)),
                                     Entry::Vacant(vac) => {
-                                        log::debug!("Inserting new insance");
                                         let current_config: Config = (*thread_config_tx.borrow()).clone();
                                         if let Some(config) = current_config.cameras.iter().find(|cam| cam.name == name).cloned() {
                                             let cam = NeoCam::new(config, push_noti.clone()).await?;
-                                            log::debug!("New instance created");
                                             Result::Ok(Some(
                                                 vac.insert(
                                                     cam,
@@ -89,7 +86,6 @@ impl NeoReactor {
                                         }
                                     }
                                 };
-                                log::debug!("Got instance from reactor");
                                 let _ = sender.send(new);
                             },
                             NeoReactorCommand::UpdateConfig(new_conf, reply) => {
@@ -129,7 +125,7 @@ impl NeoReactor {
                         thread_config_rx.wait_for(|c| c.cameras.iter().any(|cam| cam.push_notifications)).await?; // Wait until PN are enabled
                         let r = tokio::select!{
                             v = pn.run(&pn_tx, &mut pn_rx) => {v},
-                            _ = thread_config_rx.wait_for(|c| c.cameras.iter().all(|cam| !cam.push_notifications)) => AnyResult::Ok(()), // Wait until PN are enabled => AnyResult::Ok(()), // Quit if PN is turned off
+                            _ = thread_config_rx.wait_for(|c| c.cameras.iter().all(|cam| !cam.push_notifications)) => AnyResult::Ok(()), // Quit if PN is turned off
                         };
                         if r.is_err() {
                             log::debug!("Issue with push notifier: {r:?}");
@@ -140,7 +136,6 @@ impl NeoReactor {
                     }
                 } => v,
             };
-            log::debug!("Push notifier ended: {r:?}");
             r
         });
 
