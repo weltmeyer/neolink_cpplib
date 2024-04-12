@@ -88,6 +88,6 @@ RUN gst-inspect-1.0; \
 
 ENV NEO_LINK_MODE="rtsp" NEO_LINK_PORT=8554
 
-CMD timeout 1800 valgrind --tool=massif --massif-out-file=/valgrind/massif.out /usr/local/bin/neolink ${NEO_LINK_MODE} --config /etc/neolink.toml
+CMD timeout 1800 valgrind --tool=massif --massif-out-file="/valgrind/massif.out.%p" /usr/local/bin/neolink ${NEO_LINK_MODE} --config /etc/neolink.toml
 ENTRYPOINT ["/entrypoint.sh"]
 EXPOSE ${NEO_LINK_PORT}

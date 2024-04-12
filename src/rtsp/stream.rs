@@ -648,7 +648,6 @@ fn pad_vid<E, T: Stream<Item = Result<StampedData, E>> + Unpin>(
                             ),
                             ts: frame.ts,
                         };
-                    log::info!("pad_size: {}", frame.data.len());
                     yield Ok(frame);
                 } else {
                     yield Ok(frame);
@@ -748,7 +747,7 @@ async fn send_to_appsrc<E, T: Stream<Item = Result<StampedData, E>> + Unpin>(
                     log::info!("new pool: {}", size);
                     let pool = gstreamer::BufferPool::new();
                     let mut pool_config = pool.config();
-                    pool_config.set_params(None, (*size) as u32, 8, 32);
+                    pool_config.set_params(None, (*size) as u32, 8, 0);
                     pool.set_config(pool_config).unwrap();
                     // let (allocator, alloc_parms) = pool.allocator().unwrap();
                     pool.set_active(true).unwrap();
