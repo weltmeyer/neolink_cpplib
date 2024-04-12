@@ -722,6 +722,7 @@ async fn send_to_appsrc<E, T: Stream<Item = Result<StampedData, E>> + Unpin>(
     let mut pools: HashMap<usize, gstreamer::BufferPool> = Default::default();
     let mut dts: u64 = 0;
     let mut buffer_inited = false;
+    log::info!("Setting stream to pause");
     appsrc.set_state(gstreamer::State::Paused).unwrap();
 
     while let Some(Ok(data)) = stream.next().await {
@@ -778,6 +779,7 @@ async fn send_to_appsrc<E, T: Stream<Item = Result<StampedData, E>> + Unpin>(
             Err(e) => Err(anyhow!("Error in streaming: {e:?}")),
         }?;
         if !buffer_inited && appsrc.current_level_bytes() >= appsrc.max_bytes() {
+            log::info!("Setting stream to play");
             appsrc.set_state(gstreamer::State::Playing).unwrap();
             buffer_inited = true;
         }
