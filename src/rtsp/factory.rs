@@ -156,7 +156,7 @@ fn build_unknown(bin: &Element, pattern: &str) -> Result<()> {
 }
 
 fn build_h264(bin: &Element, stream_config: &StreamConfig) -> Result<AppSrc> {
-    let buffer_size = buffer_size(stream_config.bitrate / 10);
+    let buffer_size = buffer_size(stream_config.bitrate / 10 / 8);
     let bin = bin
         .clone()
         .dynamic_cast::<Bin>()
@@ -170,7 +170,7 @@ fn build_h264(bin: &Element, stream_config: &StreamConfig) -> Result<AppSrc> {
     source.set_block(false);
     source.set_min_latency(0);
     source.set_property("emit-signals", false);
-    source.set_max_bytes(buffer_size as u64 * 3);
+    source.set_max_bytes(buffer_size as u64);
     source.set_do_timestamp(false);
     source.set_stream_type(AppStreamType::Seekable);
 
@@ -191,7 +191,7 @@ fn build_h264(bin: &Element, stream_config: &StreamConfig) -> Result<AppSrc> {
 }
 
 fn build_h265(bin: &Element, stream_config: &StreamConfig) -> Result<AppSrc> {
-    let buffer_size = buffer_size(stream_config.bitrate / 10);
+    let buffer_size = buffer_size(stream_config.bitrate / 8 / 10);
     let bin = bin
         .clone()
         .dynamic_cast::<Bin>()
@@ -204,7 +204,7 @@ fn build_h265(bin: &Element, stream_config: &StreamConfig) -> Result<AppSrc> {
     source.set_block(false);
     source.set_min_latency(0);
     source.set_property("emit-signals", false);
-    source.set_max_bytes(buffer_size as u64 * 3);
+    source.set_max_bytes(buffer_size as u64);
     source.set_do_timestamp(false);
     source.set_stream_type(AppStreamType::Seekable);
 
@@ -239,7 +239,7 @@ fn build_aac(bin: &Element, stream_config: &StreamConfig) -> Result<AppSrc> {
     source.set_block(false);
     source.set_min_latency(0);
     source.set_property("emit-signals", false);
-    source.set_max_bytes(buffer_size as u64 * 3);
+    source.set_max_bytes(buffer_size as u64);
     source.set_do_timestamp(false);
     source.set_stream_type(AppStreamType::Seekable);
 
@@ -310,7 +310,7 @@ fn build_adpcm(bin: &Element, block_size: u32, stream_config: &StreamConfig) -> 
     source.set_block(false);
     source.set_min_latency(0);
     source.set_property("emit-signals", false);
-    source.set_max_bytes(buffer_size as u64 * 3);
+    source.set_max_bytes(buffer_size as u64);
     source.set_do_timestamp(false);
     source.set_stream_type(AppStreamType::Seekable);
 
