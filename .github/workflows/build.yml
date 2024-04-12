@@ -30,7 +30,7 @@ jobs:
       matrix:
         os: [ubuntu-22.04, windows-2022, macos-12]
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         name: Checkout onto ${{ runner.os }}
       - if: runner.os == 'Linux'
         name: apt install gstreamer
@@ -94,18 +94,18 @@ jobs:
           echo "OPENSSL_INCLUDE_DIR=$(brew --prefix openssl@1.1)/include/" >>  "${GITHUB_ENV}"
           echo "OPENSSL_LIB_DIR=$(brew --prefix openssl@1.1)/lib/" >>  "${GITHUB_ENV}"
       - name: Cache cargo registry
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: ~/.cargo/registry
           key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
       - name: Cache cargo index
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: ~/.cargo/git
           key: ${{ runner.os }}-cargo-index-${{ hashFiles('**/Cargo.lock') }}
       - name: Cache cargo build
         if: runner.os != 'macOS' # Random missing crates on macOS, unclear why
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: target
           key: ${{ runner.os }}-cargo-build-target-${{ hashFiles('**/Cargo.lock') }}
@@ -117,7 +117,7 @@ jobs:
           echo "PKG_CONFIG_PATH=${PKG_CONFIG_PATH}"
           # pkg-config --variable pc_path pkg-config
           cargo  build --all-features
-      - uses: actions/upload-artifact@v3
+      - uses: actions/upload-artifact@v4
         with:
           name: debug-${{ matrix.os }}
           path: "target/debug/neolink*"
@@ -152,7 +152,7 @@ jobs:
             # on i686, the pkgconfig path doesn't match the prefix!
             pkgconfig: i386-linux-gnu
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Install basic tools
         run: |
           apt-get update
@@ -188,7 +188,7 @@ jobs:
           PKG_CONFIG_ALLOW_CROSS: 1
           PKG_CONFIG_LIBDIR: /usr/lib/${{ matrix.pkgconfig }}/pkgconfig
           TARGET: ${{ matrix.target }}
-      - uses: actions/upload-artifact@v3
+      - uses: actions/upload-artifact@v4
         with:
           name: debug-${{ matrix.arch }}-bookworm
           path: "target/${{ matrix.target }}/debug/neolink*"
@@ -210,27 +210,27 @@ jobs:
         env:
           SECRET: "${{ secrets.DOCKER_TOKEN }}"
       - name: Check out the repo
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         if: ${{ steps.vars.outputs.HAS_SECRET_TOKEN }}
       - name: Convert username to lower case for docker
         id: string_user
-        uses: ASzc/change-string-case-action@v5
+        uses: ASzc/change-string-case-action@v6
         with:
           string: ${{ github.repository_owner }}
       - name: Convert repo to lower case for docker
         id: string_repo
-        uses: ASzc/change-string-case-action@v5
+        uses: ASzc/change-string-case-action@v6
         with:
           string: ${{ github.repository }}
       - name: Set up QEMU
         if: ${{ steps.vars.outputs.HAS_SECRET_TOKEN }}
-        uses: docker/setup-qemu-action@v2
+        uses: docker/setup-qemu-action@v3
       - name: Set up Docker Buildx
         if: ${{ steps.vars.outputs.HAS_SECRET_TOKEN }}
-        uses: docker/setup-buildx-action@v2
+        uses: docker/setup-buildx-action@v3
       - name: Login to Docker Hub
         if: ${{ steps.vars.outputs.HAS_SECRET_TOKEN }}
-        uses: docker/login-action@v2
+        uses: docker/login-action@v3
         with:
           registry: docker.io
           username: ${{ vars.DOCKER_USERNAME || steps.string_user.outputs.lowercase }}
@@ -297,28 +297,28 @@ jobs:
           mkdir linux/arm
           mkdir linux/arm64
       - name: Download Linux x86_64
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: debug-amd64-bookworm
           path: linux/amd64
       - name: Download Linux armv7
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: debug-armhf-bookworm
           path: linux/arm/v7
       - name: Download Linux arm64
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: debug-arm64-bookworm
           path: linux/arm64
       - name: Download Linux i386
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: debug-i386-bookworm
           path: linux/386
       - name: Push to Docker Hub
         if: ${{ steps.vars.outputs.HAS_SECRET_TOKEN }}
-        uses: docker/build-push-action@v3
+        uses: docker/build-push-action@v5
         with:
           platforms: linux/amd64,linux/arm/v7,linux/arm64,linux/386
           context: .
@@ -338,7 +338,7 @@ jobs:
       - "native"
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       - name: Install latest rust
         run: |
           rustup toolchain install stable
@@ -351,37 +351,37 @@ jobs:
           NEOLINK_VERSION="$(toml get Cargo.toml  package.version | sed 's|"||g')"
           echo "version=${NEOLINK_VERSION}"  >> $GITHUB_OUTPUT
       - name: Download Windows
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: debug-windows-2022
           path: neolink_windows
       - name: Download Macos
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: debug-macos-12
           path: neolink_macos
       - name: Download Linux x86_64
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: debug-ubuntu-22.04
           path: neolink_linux_x86_64_ubuntu
       - name: Download Linux x86_64
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: debug-amd64-bookworm
           path: neolink_linux_x86_64_bookworm
       - name: Download Linux armhf
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: debug-armhf-bookworm
           path: neolink_linux_armhf
       - name: Download Linux arm64
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: debug-arm64-bookworm
           path: neolink_linux_arm64
       - name: Download Linux i386
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: debug-i386-bookworm
           path: neolink_linux_i386
