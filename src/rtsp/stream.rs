@@ -785,6 +785,12 @@ async fn send_to_appsrc<E, T: Stream<Item = Result<StampedData, E>> + Unpin>(
                 log::info!("Setting stream to play");
                 appsrc.set_state(gstreamer::State::Playing).unwrap();
                 buffer_inited = true;
+            } else {
+                log::info!(
+                    "Not yet ready: {}/{}",
+                    appsrc.current_level_bytes(),
+                    appsrc.max_bytes()
+                );
             }
         }
         AnyResult::Ok(())
