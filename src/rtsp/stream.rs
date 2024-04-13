@@ -769,19 +769,29 @@ async fn send_to_appsrc<E, T: Stream<Item = Result<StampedData, E>> + Unpin>(
             };
 
             match appsrc.push_buffer(buf) {
-                Ok(_) => Ok(()),
+                Ok(_) => {
+                    log::info!(
+                        "Send {}{} on {}",
+                        data.data.len(),
+                        if data.keyframe { " (keyframe)" } else { "" },
+                        appsrc.name()
+                    );
+                    Ok(())
+                }
                 Err(FlowError::Flushing) => {
                     // Buffer is full just skip
                     //
                     // But ensure we start with an iframe to reduce gray screens
                     wait_for_iframe = true;
+                    log::info!("Buffer full on {}", appsrc.name());
                     Ok(())
                 }
                 Err(e) => Err(anyhow!("Error in streaming: {e:?}")),
             }?;
-            if !buffer_inited && appsrc.current_level_bytes() >= appsrc.max_bytes() {
+            if !buffer_inited && appsrc.current_level_bytes() >= (appsrc.max_bytes() * 3 / 2) {
                 appsrc.set_state(gstreamer::State::Playing).unwrap();
                 buffer_inited = true;
+                log::info!("Playing state on {}", appsrc.name());
             }
         }
         AnyResult::Ok(())
