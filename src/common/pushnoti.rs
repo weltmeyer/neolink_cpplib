@@ -11,6 +11,7 @@ use tokio::{
         mpsc::{Receiver as MpscReceiver, Sender as MpscSender},
         oneshot::Sender as OneshotSender,
         watch::{channel as watch, Receiver as WatchReceiver, Sender as WatchSender},
+        RwLock,
     },
     time::{sleep, timeout, Duration},
 };
@@ -119,21 +120,6 @@ impl PushNotiThread {
 
             log::debug!("Push notification Listening");
             let thread_pn_watcher = self.pn_watcher.clone();
-            let mut listener = FcmPushListener::create(
-                registration,
-                |message: FcmMessage| {
-                    log::debug!("Got FCM Message: {:?}", message.payload_json);
-                    if let Some(id) = message.persistent_id.clone() {
-                        // Don't worry if queue is full we will just not register as received yet
-                        let _ = sender.try_send(PnRequest::AddPushID { id });
-                    }
-                    thread_pn_watcher.send_replace(Some(PushNoti {
-                        message: message.payload_json,
-                        id: message.persistent_id,
-                    }));
-                },
-                self.received_ids.clone(),
-            );
 
             for instance in self.registed_cameras.iter() {
                 let uid = uid.clone();
@@ -159,9 +145,25 @@ impl PushNotiThread {
                 });
             }
 
+            let received_ids = Arc::new(RwLock::new(self.received_ids.clone()));
             tokio::select! {
                 v = async {
                     loop {
+                        let mut listener = FcmPushListener::create(
+                            registration.clone(),
+                            |message: FcmMessage| {
+                                log::debug!("Got FCM Message: {:?}", message.payload_json);
+                                if let Some(id) = message.persistent_id.clone() {
+                                    // Don't worry if queue is full we will just not register as received yet
+                                    let _ = sender.try_send(PnRequest::AddPushID { id });
+                                }
+                                thread_pn_watcher.send_replace(Some(PushNoti {
+                                    message: message.payload_json,
+                                    id: message.persistent_id,
+                                }));
+                            },
+                            received_ids.read().await.clone(),
+                        );
                         let r = timeout(Duration::from_secs(60*5), listener.connect()).await;
                         match &r {
                             Ok(Ok(_)) => {
@@ -225,7 +227,8 @@ impl PushNotiThread {
                                 });
                             }
                             PnRequest::AddPushID{id} => {
-                                self.received_ids.push(id);
+                                self.received_ids.push(id.clone());
+                                received_ids.write().await.push(id);
                             }
                         }
                     }
