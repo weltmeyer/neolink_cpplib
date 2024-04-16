@@ -364,7 +364,7 @@ pub struct D2cCfm {
     /// The camera connection ID
     pub did: i32,
     /// The time but only value that has been observed is `0
-    pub time_r: u32,
+    pub time_r: Option<u32>,
 }
 
 /// C2R_CFM xml
