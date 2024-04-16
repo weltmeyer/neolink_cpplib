@@ -239,7 +239,7 @@ mod tests {
                         rsp: 0,
                         cid: 82001,
                         did: 96,
-                        time_r: 0,
+                        time_r: Some(0),
                     }),
             })) if &conn_str == "local"
         );
