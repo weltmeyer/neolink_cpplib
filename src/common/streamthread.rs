@@ -408,6 +408,14 @@ impl StreamData {
         let vid_history = me.vid_history.clone();
         let aud_history = me.aud_history.clone();
         let mut permit = instance.permit().await?;
+
+        // Rather than extract the time stamp from the frame data we
+        // create a new one from the fps
+        // this makes it easier to play the frames at a constant rate
+        // even across reconnects (since reconnects restart the ts otherwise)
+        let mut master_ts = Duration::ZERO;
+        let mut fps_delta = Duration::from_millis(1000 / (config.borrow().fps as u64));
+
         me.handle = Some(tokio::task::spawn(async move {
             let r = tokio::select! {
                 _ = cancel.cancelled() => {
@@ -471,7 +479,6 @@ impl StreamData {
                                         let mut aud_keyframe = false;
 
                                         let res = async {
-                                            let mut prev_ts = Duration::ZERO;
                                             let mut stream_data = camera.start_video(name, 0, strict).await?;
                                             loop {
                                                 let data = stream_data.get_data().await??;
@@ -491,6 +498,7 @@ impl StreamData {
                                                                 false
                                                             }
                                                         });
+                                                        fps_delta = Duration::from_millis(1000 / (stream_config.borrow().fps as u64));
                                                     },
                                                     BcMedia::InfoV2(info) => {
                                                         stream_config.send_if_modified(|state| {
@@ -504,6 +512,7 @@ impl StreamData {
                                                                 false
                                                             }
                                                         });
+                                                        fps_delta = Duration::from_millis(1000 / (stream_config.borrow().fps as u64));
                                                     },
                                                     BcMedia::Iframe(frame) => {
                                                         stream_config.send_if_modified(|state| {
@@ -559,54 +568,60 @@ impl StreamData {
                                                 }
 
                                                 match data {
-                                                    BcMedia::Iframe(BcMediaIframe{data, microseconds, ..}) => {
-                                                        prev_ts = Duration::from_micros(microseconds as u64);
+                                                    BcMedia::Iframe(BcMediaIframe{data, ..}) => {
                                                         let d = StampedData{
                                                                 keyframe: true,
                                                                 data: Arc::new(data),
-                                                                ts: prev_ts
+                                                                ts: master_ts,
                                                         };
                                                         let _ = vid_tx.send(d.clone());
                                                         vid_history.send_modify(|history| {
                                                            let drop_time = d.ts.saturating_sub(BUFFER_DURATION);
+                                                           let dts = d.ts;
                                                            history.push_back(d);
-                                                           while history.front().is_some_and(|di| di.ts < drop_time) {
+                                                           while history.front().is_some_and(|di| di.ts < drop_time || di.ts > dts) {
                                                                history.pop_front();
                                                            }
+                                                           log::info!("history: {}", history.len());
+                                                           let debug: Vec<Duration> = history.iter().map(|f| f.ts).collect();
+                                                           log::info!("history ts: {:?}", debug);
                                                         });
                                                         recieved_iframe = true;
                                                         aud_keyframe = true;
                                                         log::trace!("Sent Vid Key Frame");
+                                                        master_ts += fps_delta;
                                                     },
-                                                    BcMedia::Pframe(BcMediaPframe{data, microseconds,..}) if recieved_iframe => {
-                                                        prev_ts = Duration::from_micros(microseconds as u64);
+                                                    BcMedia::Pframe(BcMediaPframe{data, ..}) if recieved_iframe => {
                                                         let d = StampedData{
                                                             keyframe: false,
                                                             data: Arc::new(data),
-                                                            ts: prev_ts
+                                                            ts: master_ts,
                                                         };
                                                         let _ = vid_tx.send(d.clone());
                                                         vid_history.send_modify(|history| {
                                                            let drop_time = d.ts.saturating_sub(BUFFER_DURATION);
+                                                           let dts = d.ts;
                                                            history.push_back(d);
-                                                           while history.front().is_some_and(|di| di.ts < drop_time) {
+                                                           while history.front().is_some_and(|di| di.ts < drop_time || di.ts > dts) {
                                                                history.pop_front();
                                                            }
                                                         });
+                                                        master_ts += fps_delta;
                                                         log::trace!("Sent Vid Frame");
                                                     }
                                                     BcMedia::Aac(BcMediaAac{data, ..}) | BcMedia::Adpcm(BcMediaAdpcm{data,..}) if recieved_iframe => {
                                                         let d = StampedData{
                                                             keyframe: aud_keyframe,
                                                             data: Arc::new(data),
-                                                            ts: prev_ts,
+                                                            ts: master_ts,
                                                         };
                                                         aud_keyframe = false;
                                                         let _ = aud_tx.send(d.clone())?;
                                                         aud_history.send_modify(|history| {
                                                            let drop_time = d.ts.saturating_sub(BUFFER_DURATION);
+                                                           let dts = d.ts;
                                                            history.push_back(d);
-                                                           while history.front().is_some_and(|di| di.ts < drop_time) {
+                                                           while history.front().is_some_and(|di| di.ts < drop_time || di.ts > dts) {
                                                                history.pop_front();
                                                            }
                                                         });
@@ -616,6 +631,7 @@ impl StreamData {
                                                 }
                                             }
                                         }.await;
+                                        log::info!("video outgoing queue: {}", vid_tx.len());
                                         Ok(res)
                                     })
                                 }) => {
