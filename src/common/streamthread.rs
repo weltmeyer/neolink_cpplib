@@ -579,7 +579,7 @@ impl StreamData {
                                                            let drop_time = d.ts.saturating_sub(BUFFER_DURATION);
                                                            let dts = d.ts;
                                                            history.push_back(d);
-                                                           while history.front().is_some_and(|di| di.ts < drop_time || di.ts > dts) {
+                                                           while history.front().is_some_and(|di| di.ts < drop_time || di.ts > dts) || history.len() > 1000 {
                                                                history.pop_front();
                                                            }
                                                            log::info!("history: {}", history.len());
@@ -602,7 +602,7 @@ impl StreamData {
                                                            let drop_time = d.ts.saturating_sub(BUFFER_DURATION);
                                                            let dts = d.ts;
                                                            history.push_back(d);
-                                                           while history.front().is_some_and(|di| di.ts < drop_time || di.ts > dts) {
+                                                           while history.front().is_some_and(|di| di.ts < drop_time || di.ts > dts)  || history.len() > 1000 {
                                                                history.pop_front();
                                                            }
                                                         });
@@ -621,7 +621,7 @@ impl StreamData {
                                                            let drop_time = d.ts.saturating_sub(BUFFER_DURATION);
                                                            let dts = d.ts;
                                                            history.push_back(d);
-                                                           while history.front().is_some_and(|di| di.ts < drop_time || di.ts > dts) {
+                                                           while history.front().is_some_and(|di| di.ts < drop_time || di.ts > dts) || history.len() > 1000 {
                                                                history.pop_front();
                                                            }
                                                         });
