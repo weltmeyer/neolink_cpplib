@@ -172,7 +172,7 @@ fn build_h264(bin: &Element, stream_config: &StreamConfig) -> Result<AppSrc> {
 
     source.set_is_live(false);
     source.set_block(false);
-    source.set_min_latency(0);
+    source.set_min_latency(1000 / (stream_config.fps as i64));
     source.set_property("emit-signals", false);
     source.set_max_bytes(buffer_size as u64);
     source.set_do_timestamp(false);
@@ -206,7 +206,7 @@ fn build_h265(bin: &Element, stream_config: &StreamConfig) -> Result<AppSrc> {
         .map_err(|_| anyhow!("Cannot cast to appsrc."))?;
     source.set_is_live(false);
     source.set_block(false);
-    source.set_min_latency(0);
+    source.set_min_latency(1000 / (stream_config.fps as i64));
     source.set_property("emit-signals", false);
     source.set_max_bytes(buffer_size as u64);
     source.set_do_timestamp(false);
@@ -228,7 +228,7 @@ fn build_h265(bin: &Element, stream_config: &StreamConfig) -> Result<AppSrc> {
     Ok(source)
 }
 
-fn build_aac(bin: &Element, _stream_config: &StreamConfig) -> Result<AppSrc> {
+fn build_aac(bin: &Element, stream_config: &StreamConfig) -> Result<AppSrc> {
     let buffer_size = 512 * 6;
     let bin = bin
         .clone()
@@ -241,7 +241,7 @@ fn build_aac(bin: &Element, _stream_config: &StreamConfig) -> Result<AppSrc> {
 
     source.set_is_live(false);
     source.set_block(false);
-    source.set_min_latency(0);
+    source.set_min_latency(1000 / (stream_config.fps as i64));
     source.set_property("emit-signals", false);
     source.set_max_bytes(buffer_size as u64);
     source.set_do_timestamp(false);
@@ -293,7 +293,7 @@ fn build_aac(bin: &Element, _stream_config: &StreamConfig) -> Result<AppSrc> {
     Ok(source)
 }
 
-fn build_adpcm(bin: &Element, block_size: u32, _stream_config: &StreamConfig) -> Result<AppSrc> {
+fn build_adpcm(bin: &Element, block_size: u32, stream_config: &StreamConfig) -> Result<AppSrc> {
     let buffer_size = 512 * 6;
     let bin = bin
         .clone()
@@ -312,7 +312,7 @@ fn build_adpcm(bin: &Element, block_size: u32, _stream_config: &StreamConfig) ->
         .map_err(|_| anyhow!("Cannot cast to appsrc."))?;
     source.set_is_live(false);
     source.set_block(false);
-    source.set_min_latency(0);
+    source.set_min_latency(1000 / (stream_config.fps as i64));
     source.set_property("emit-signals", false);
     source.set_max_bytes(buffer_size as u64);
     source.set_do_timestamp(false);
@@ -447,5 +447,5 @@ fn make_queue(name: &str, buffer_size: u32) -> AnyResult<Element> {
 
 fn buffer_size(bitrate: u32) -> u32 {
     // 0.1 seconds (according to bitrate) or 4kb what ever is larger
-    std::cmp::max(bitrate / 10u32 / 8u32, 4u32 * 1024u32)
+    std::cmp::max(bitrate * 2 / 8u32, 4u32 * 1024u32)
 }
