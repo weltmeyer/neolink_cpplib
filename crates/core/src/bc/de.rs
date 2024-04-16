@@ -121,6 +121,7 @@ fn bc_modern_msg<'a>(
         // Apply the XML parse function, but throw away the reference to decrypted in the Ok and
         // Err case. This error-error-error thing is the same idiom Nom uses internally.
         let parsed = Extension::try_parse(processed_ext_buf).map_err(|_| {
+            log::error!("Extension buffer: {:?}", processed_ext_buf);
             Err::Error(make_error(
                 buf,
                 "Unable to parse Extension XML",
