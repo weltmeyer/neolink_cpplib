@@ -413,8 +413,8 @@ async fn stream_run(
         let mut thread_client_count = client_count.subscribe();
         let thread_format = stream_config.vid_format;
         // let fallback_time = Duration::from_secs(3);
-        // let framerate =
-        //     Duration::from_millis(1000u64 / std::cmp::max(stream_config.fps as u64, 5u64));
+        let framerate =
+            Duration::from_millis(1000u64 / std::cmp::max(stream_config.fps as u64, 5u64));
         if let Some(thread_vid) = thread_vid {
             set.spawn(async move {
                 thread_client_count.activate().await?;
@@ -424,14 +424,18 @@ async fn stream_run(
                     },
                     v = send_to_appsrc(
                         pad_vid(
-                            // frametime_stream(
-                                // ensure_order(
-                                    wait_for_keyframe(
-                                        vid_data_rx,
-                                    ),
-                                // ),
-                            //     framerate
-                            // ),
+                            insert_filler(
+                                frametime_stream(
+                                    // ensure_order(
+                                        wait_for_keyframe(
+                                            vid_data_rx,
+                                        ),
+                                    // ),
+                                    framerate
+                                ),
+                                thread_format,
+                                framerate,
+                            ),
                             thread_format,
                         ),
                         &thread_vid
@@ -449,8 +453,8 @@ async fn stream_run(
         let thread_stream_cancel = stream_cancel.clone();
         let aud_data_rx = BroadcastStream::new(aud_data_rx).filter(|f| f.is_ok()); // Filter to ignore lagged
         let thread_aud = aud.clone();
-        // let aud_framerate =
-        //     Duration::from_millis(1000u64 / std::cmp::max(stream_config.fps as u64, 5u64));
+        let aud_framerate =
+            Duration::from_millis(1000u64 / std::cmp::max(stream_config.fps as u64, 5u64));
         if let Some(thread_aud) = thread_aud {
             set.spawn(async move {
                 let r = tokio::select! {
@@ -458,13 +462,13 @@ async fn stream_run(
                         AnyResult::Ok(())
                     },
                     v = send_to_appsrc(
-                        // frametime_stream(
+                        frametime_stream(
                             // ensure_order(
                                 wait_for_keyframe(
                                     aud_data_rx
                                 ),
                             // ),
-                            // aud_framerate),
+                            aud_framerate),
                         &thread_aud) => {
                         v
                     },
@@ -490,9 +494,10 @@ fn check_live(app: &AppSrc) -> Result<()> {
         .iter()
         .all(|pad| pad.is_linked())
         .then_some(())
-        .ok_or(anyhow!("App source is closed"))
+        .ok_or(anyhow!("App source is not linked"))
 }
 
+#[allow(dead_code)]
 fn get_runtime(app: &AppSrc) -> Option<Duration> {
     if let Some(clock) = app.clock() {
         if let Some(time) = clock.time() {
@@ -595,6 +600,48 @@ fn frametime_stream<E, T: Stream<Item = Result<StampedData, E>> + Unpin>(
         while let Some(frame) = stream.next().await {
             if let Ok(frame) = frame {
                 waiter.tick().await;
+                yield Ok(frame);
+            }
+        }
+    })
+}
+
+/// Insert filler into the video stream when no frames are comming
+/// this should help the stream not be considered dead while
+/// we wait for the reconnect
+fn insert_filler<E, T: Stream<Item = Result<StampedData, E>> + Unpin>(
+    mut stream: T,
+    format: VidFormat,
+    delay: Duration,
+) -> impl Stream<Item = AnyResult<StampedData>> + Unpin {
+    let mut last_ts = Duration::ZERO;
+    Box::pin(async_stream::stream! {
+        while let Some(frame) = tokio::select!{
+            v = stream.next() => {
+                v
+            },
+            _ = tokio::time::sleep(delay) => {
+                match format {
+                    VidFormat::H264 => {
+                        Some(Ok(StampedData {
+                            data: Arc::new(h264_filler(4096)),
+                            keyframe: false,
+                            ts: last_ts,
+                        }))
+                    }
+                    VidFormat::H265 => {
+                        Some(Ok(StampedData {
+                            data: Arc::new(h265_filler(4096)),
+                            keyframe: false,
+                            ts: last_ts,
+                        }))
+                    }
+                    VidFormat::None => unreachable!(),
+                }
+            }
+        } {
+            if let Ok(frame) = frame {
+                last_ts = frame.ts;
                 yield Ok(frame);
             }
         }
@@ -719,88 +766,108 @@ async fn send_to_appsrc<E, T: Stream<Item = Result<StampedData, E>> + Unpin>(
     mut stream: T,
     appsrc: &AppSrc,
 ) -> AnyResult<()> {
-    let mut rt = Duration::ZERO;
+    let mut ts_0 = Duration::MAX;
     let mut wait_for_iframe = true;
     let mut pools: HashMap<usize, gstreamer::BufferPool> = Default::default();
-    let mut buffer_inited = false;
-    let mut dts = 1;
-    appsrc.set_state(gstreamer::State::Paused).unwrap();
+    let mut keyframes_pushed = 0;
+    let mut inited = false;
+    // appsrc.set_state(gstreamer::State::Paused).unwrap();
 
     let (tx, mut rx) = tokio::sync::mpsc::channel::<StampedData>(2000);
 
     // Run blocking code on a seperate thread
     let appsrc = appsrc.clone();
     std::thread::spawn(move || {
-        while let Some(data) = rx.blocking_recv() {
-            check_live(&appsrc)?; // Stop if appsrc is dropped
-            if wait_for_iframe && !data.keyframe {
-                continue;
-            } else if wait_for_iframe {
-                wait_for_iframe = false;
-            }
+        let r = (move || {
+            while let Some(data) = rx.blocking_recv() {
+                check_live(&appsrc)?; // Stop if appsrc is dropped
+                if wait_for_iframe && !data.keyframe {
+                    continue;
+                } else if wait_for_iframe {
+                    wait_for_iframe = false;
+                }
+                if ts_0 > data.ts {
+                    ts_0 = data.ts;
+                }
+                let rt = data.ts - ts_0;
+                // log::info!("rt: {:?}", rt);
+                let buf = {
+                    // let mut gst_buf = pool.acquire_buffer(None).unwrap();
+                    let msg_size = data.data.len();
+                    let pool = pools.entry(msg_size).or_insert_with_key(|size| {
+                        let pool = gstreamer::BufferPool::new();
+                        let mut pool_config = pool.config();
+                        pool_config.set_params(None, (*size) as u32, 8, 0);
+                        pool.set_config(pool_config).unwrap();
+                        // let (allocator, alloc_parms) = pool.allocator().unwrap();
+                        pool.set_active(true).unwrap();
+                        pool
+                    });
+                    let mut gst_buf = pool.acquire_buffer(None).unwrap();
+                    // let mut gst_buf = gstreamer::Buffer::with_size(data.data.len()).unwrap();
+                    {
+                        let gst_buf_mut = gst_buf.get_mut().unwrap();
+                        let time = ClockTime::from_useconds(rt.as_micros() as u64);
+                        // gst_buf_mut.set_dts(ClockTime::from_useconds(dts));
+                        gst_buf_mut.set_dts(time);
+                        gst_buf_mut.set_pts(time);
+                        let mut gst_buf_data = gst_buf_mut.map_writable().unwrap();
+                        gst_buf_data.copy_from_slice(data.data.as_slice());
+                    }
+                    gst_buf
+                };
 
-            if let Some(rt_i) = get_runtime(&appsrc) {
-                rt = rt_i;
+                match appsrc.push_buffer(buf) {
+                    Ok(_) => {
+                        // log::info!(
+                        //     "Send {}{} on {}",
+                        //     data.data.len(),
+                        //     if data.keyframe { " (keyframe)" } else { "" },
+                        //     appsrc.name()
+                        // );
+                        Ok(())
+                    }
+                    Err(FlowError::Flushing) => {
+                        // Buffer is full just skip
+                        //
+                        // But ensure we start with an iframe to reduce gray screens
+                        wait_for_iframe = true;
+                        log::info!("Buffer full on {}", appsrc.name());
+                        Ok(())
+                    }
+                    Err(e) => Err(anyhow!("Error in streaming: {e:?}")),
+                }?;
+                if !inited {
+                    if keyframes_pushed > 1
+                        || appsrc.current_level_bytes() >= appsrc.max_bytes() * 2 / 3
+                    {
+                        // log::info!("=== Playing state on {}", appsrc.name());
+                        // log::info!(
+                        //     "Buffer filled to {} of {} ({} %) in {} keyframes",
+                        //     appsrc.current_level_bytes(),
+                        //     appsrc.max_bytes(),
+                        //     appsrc.current_level_bytes() * 100 / appsrc.max_bytes(),
+                        //     keyframes_pushed
+                        // );
+                        inited = true;
+                        // appsrc.set_state(gstreamer::State::Playing).unwrap();
+                    } else if data.keyframe {
+                        // log::info!(
+                        //     "Buffer filling to {} of {} ({} %) in {} keyframes on {}",
+                        //     appsrc.current_level_bytes(),
+                        //     appsrc.max_bytes(),
+                        //     appsrc.current_level_bytes() * 100 / appsrc.max_bytes(),
+                        //     keyframes_pushed,
+                        //     appsrc.name()
+                        // );
+                        keyframes_pushed += 1;
+                    }
+                }
             }
-            let buf = {
-                // let mut gst_buf = pool.acquire_buffer(None).unwrap();
-                let msg_size = data.data.len();
-                let pool = pools.entry(msg_size).or_insert_with_key(|size| {
-                    let pool = gstreamer::BufferPool::new();
-                    let mut pool_config = pool.config();
-                    pool_config.set_params(None, (*size) as u32, 8, 0);
-                    pool.set_config(pool_config).unwrap();
-                    // let (allocator, alloc_parms) = pool.allocator().unwrap();
-                    pool.set_active(true).unwrap();
-                    pool
-                });
-                let mut gst_buf = pool.acquire_buffer(None).unwrap();
-                // let mut gst_buf = gstreamer::Buffer::with_size(data.data.len()).unwrap();
-                {
-                    let gst_buf_mut = gst_buf.get_mut().unwrap();
-                    let time = ClockTime::from_useconds(rt.as_micros() as u64);
-                    gst_buf_mut.set_dts(ClockTime::from_useconds(dts));
-                    dts += 1;
-                    gst_buf_mut.set_pts(time);
-                    let mut gst_buf_data = gst_buf_mut.map_writable().unwrap();
-                    gst_buf_data.copy_from_slice(data.data.as_slice());
-                }
-                gst_buf
-            };
-
-            match appsrc.push_buffer(buf) {
-                Ok(_) => {
-                    log::info!(
-                        "Send {}{} on {}",
-                        data.data.len(),
-                        if data.keyframe { " (keyframe)" } else { "" },
-                        appsrc.name()
-                    );
-                    Ok(())
-                }
-                Err(FlowError::Flushing) => {
-                    // Buffer is full just skip
-                    //
-                    // But ensure we start with an iframe to reduce gray screens
-                    wait_for_iframe = true;
-                    log::info!("Buffer full on {}", appsrc.name());
-                    Ok(())
-                }
-                Err(e) => Err(anyhow!("Error in streaming: {e:?}")),
-            }?;
-            if !buffer_inited && appsrc.current_level_bytes() >= (appsrc.max_bytes() * 3 / 2) {
-                appsrc.set_state(gstreamer::State::Playing).unwrap();
-                buffer_inited = true;
-                log::info!("Playing state on {}", appsrc.name());
-            } else if !buffer_inited {
-                log::info!(
-                    "{} of {}",
-                    appsrc.current_level_bytes(),
-                    (appsrc.max_bytes() * 3 / 2)
-                );
-            }
-        }
-        AnyResult::Ok(())
+            AnyResult::Ok(())
+        })();
+        log::error!("r: {:?}", r);
+        r
     });
 
     // Send to the blocking thread
@@ -810,5 +877,6 @@ async fn send_to_appsrc<E, T: Stream<Item = Result<StampedData, E>> + Unpin>(
             break;
         }
     }
+    log::error!("Exiting send_to_appsrc");
     Ok(())
 }
