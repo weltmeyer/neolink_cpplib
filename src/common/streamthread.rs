@@ -316,11 +316,11 @@ impl StreamInstance {
 
 impl StreamData {
     async fn new(name: StreamKind, instance: NeoInstance, strict: bool) -> Result<Self> {
-        const BUFFER_DURATION: Duration = Duration::from_secs(15);
+        const BUFFER_DURATION: Duration = Duration::from_secs(3);
         // At 30fps for 15s with audio is is about 900 frames
-        // Therefore we set this buffer to a rather large 2000
-        let (vid, _) = broadcast::<StampedData>(2000);
-        let (aud, _) = broadcast::<StampedData>(2000);
+        const BUFFER_SIZE: usize = 30usize * BUFFER_DURATION.as_millis() as usize / 1000usize;
+        let (vid, _) = broadcast::<StampedData>(BUFFER_SIZE);
+        let (aud, _) = broadcast::<StampedData>(BUFFER_SIZE);
         let (vid_history, _) = watch::<VecDeque<StampedData>>(VecDeque::new());
         let vid_history = Arc::new(vid_history);
         let (aud_history, _) = watch::<VecDeque<StampedData>>(VecDeque::new());
@@ -579,7 +579,7 @@ impl StreamData {
                                                            let drop_time = d.ts.saturating_sub(BUFFER_DURATION);
                                                            let dts = d.ts;
                                                            history.push_back(d);
-                                                           while history.front().is_some_and(|di| di.ts < drop_time || di.ts > dts) || history.len() > 1000 {
+                                                           while history.front().is_some_and(|di| di.ts < drop_time || di.ts > dts) || history.len() > BUFFER_SIZE {
                                                                history.pop_front();
                                                            }
                                                            log::info!("history: {}", history.len());
@@ -602,7 +602,7 @@ impl StreamData {
                                                            let drop_time = d.ts.saturating_sub(BUFFER_DURATION);
                                                            let dts = d.ts;
                                                            history.push_back(d);
-                                                           while history.front().is_some_and(|di| di.ts < drop_time || di.ts > dts)  || history.len() > 1000 {
+                                                           while history.front().is_some_and(|di| di.ts < drop_time || di.ts > dts)  || history.len() > BUFFER_SIZE {
                                                                history.pop_front();
                                                            }
                                                         });
@@ -621,7 +621,7 @@ impl StreamData {
                                                            let drop_time = d.ts.saturating_sub(BUFFER_DURATION);
                                                            let dts = d.ts;
                                                            history.push_back(d);
-                                                           while history.front().is_some_and(|di| di.ts < drop_time || di.ts > dts) || history.len() > 1000 {
+                                                           while history.front().is_some_and(|di| di.ts < drop_time || di.ts > dts) || history.len() > BUFFER_SIZE {
                                                                history.pop_front();
                                                            }
                                                         });
