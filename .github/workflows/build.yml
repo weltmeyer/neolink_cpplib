@@ -361,10 +361,10 @@ jobs:
           name: debug-macos-12
           path: neolink_macos_intel
       - name: Download Macos arm64
-          uses: actions/download-artifact@v4
-          with:
-            name: debug-macos-14
-            path: neolink_macos_m1
+        uses: actions/download-artifact@v4
+        with:
+          name: debug-macos-14
+          path: neolink_macos_m1
       - name: Download Linux x86_64
         uses: actions/download-artifact@v4
         with:
