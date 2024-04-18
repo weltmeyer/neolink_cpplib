@@ -139,6 +139,7 @@ impl Discoverer {
                         tokio::task::yield_now().await;
                         match reader.next().await {
                             Some(Ok((BcUdp::Discovery(bcudp), addr))) => {
+                                log::info!("Got {:?} for {}", bcudp, addr);
                                 let tid = bcudp.tid;
                                 let mut needs_removal = false;
                                 if let (Some(sender), true) =
@@ -158,9 +159,10 @@ impl Discoverer {
                             }
                             Some(Ok(bcudp)) => {
                                 // Only discovery packets should be possible atm
-                                trace!("Got non Discovery during discovery: {:?}", bcudp);
+                                log::info!("Got non Discovery during discovery: {:?}", bcudp);
                             }
                             Some(Err(e)) => {
+                                log::error!("Error on discovery socket: {:?}", e);
                                 let mut locked_sub = thread_subscriber.write().await;
                                 for (_, sub) in locked_sub.iter() {
                                     let _ = sub.send(Err(e.clone())).await;
@@ -371,7 +373,10 @@ impl Discoverer {
                 UdpDiscovery {
                     tid: _,
                     payload: UdpXml::D2cCr(D2cCr { did, cid, .. }),
-                } if cid == client_id => Some((addr, did)),
+                } if cid == client_id => {
+                    log::info!("Got expected reply");
+                    Some((addr, did))
+                }
                 n => {
                     log::info!("Got unexpected reply: {:?}", n);
                     None
