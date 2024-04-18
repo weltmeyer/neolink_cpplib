@@ -150,7 +150,7 @@ pub struct D2cCr {
     /// Called timer but not sure what it is a timer of
     pub timer: Timer,
     /// Unknown seems to be 0 on success and -3 on fail
-    pub rsp: u32,
+    pub rsp: i32,
     /// Client ID
     pub cid: i32,
     /// Camera ID
@@ -358,7 +358,7 @@ pub struct D2cCfm {
     /// Type of connection observed values are `"local"`
     pub conn: String,
     /// Unknown known values are `0`, `-3, seems to be 0 on success and -3 on fail`
-    pub rsp: u32,
+    pub rsp: i32,
     /// The client connection ID
     pub cid: i32,
     /// The camera connection ID
@@ -377,7 +377,7 @@ pub struct C2rCfm {
     /// Type of connection observed values are `"local"`
     pub conn: String,
     /// Unknown known values are  `0`, `-3, seems to be 0 on success and -3 on fail`
-    pub rsp: u32,
+    pub rsp: i32,
     /// The client connection ID
     pub cid: i32,
     /// The camera connection ID
@@ -438,4 +438,40 @@ pub struct D2cHb {
     pub cid: i32,
     /// The camera connection ID
     pub did: i32,
+}
+
+/// This test was added because of issues with Argus3 during discovery
+#[test]
+fn test_d2c_c_r_deser() {
+    let sample = indoc::indoc!(
+        r#"
+        <P2P>
+        <D2C_C_R>
+        <timer>
+        <def>3000</def>
+        <hb>20000</hb>
+        <hbt>60000</hbt>
+        </timer>
+        <rsp>0</rsp>
+        <cid>-376737975</cid>
+        <did>49</did>
+        </D2C_C_R>
+        </P2P>
+        "#
+    );
+    let b: UdpXml = UdpXml::try_parse(sample.as_bytes()).unwrap();
+
+    assert_matches::assert_matches!(
+        b,
+        UdpXml::D2cCr(D2cCr {
+            timer: Timer {
+                def: 3000,
+                hb: 20000,
+                hbt: 60000,
+            },
+            rsp: 0,
+            cid: -376737975,
+            did: 49,
+        })
+    );
 }
