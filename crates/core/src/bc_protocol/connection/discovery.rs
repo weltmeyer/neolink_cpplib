@@ -360,15 +360,31 @@ impl Discoverer {
             }),
         };
 
+        log::info!(
+            "Trying a direct connect to: {:?} with tid: {}",
+            addr,
+            msg.tid
+        );
+
         let (camera_address, camera_id) = self
             .retry_send(msg, addr, |bc, addr| match bc {
                 UdpDiscovery {
                     tid: _,
                     payload: UdpXml::D2cCr(D2cCr { did, cid, .. }),
                 } if cid == client_id => Some((addr, did)),
-                _ => None,
+                n => {
+                    log::info!("Got unexpected reply: {:?}", n);
+                    None
+                }
             })
             .await?;
+
+        log::info!(
+            "Direct connect success at {:?} client: {}, device: {}",
+            addr,
+            client_id,
+            camera_id
+        );
 
         let result = ConnectResult {
             addr: camera_address,
@@ -378,6 +394,7 @@ impl Discoverer {
         };
         self.keep_alive_device(tid, &result).await;
 
+        log::info!("Returning direct connect: {:?}", result);
         Ok(result)
     }
 
