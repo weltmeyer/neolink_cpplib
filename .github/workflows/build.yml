@@ -28,7 +28,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-22.04, windows-2022, macos-12]
+        os: [ubuntu-22.04, windows-2022, macos-12, macos-14] # macos-14+ is arm64
     steps:
       - uses: actions/checkout@v4
         name: Checkout onto ${{ runner.os }}
@@ -359,7 +359,12 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: debug-macos-12
-          path: neolink_macos
+          path: neolink_macos_intel
+      - name: Download Macos arm64
+          uses: actions/download-artifact@v4
+          with:
+            name: debug-macos-14
+            path: neolink_macos_m1
       - name: Download Linux x86_64
         uses: actions/download-artifact@v4
         with:
@@ -389,7 +394,8 @@ jobs:
         run: |
           dirs=(
             neolink_windows
-            neolink_macos
+            neolink_macos_intel
+            neolink_macos_m1
             neolink_linux_x86_64_ubuntu
             neolink_linux_x86_64_bookworm
             neolink_linux_armhf
@@ -406,7 +412,8 @@ jobs:
           name: Neolink ${{steps.toml.outputs.version}}
           files: |
             neolink_windows.zip
-            neolink_macos.zip
+            neolink_macos_intel.zip
+            neolink_macos_m1.zip
             neolink_linux_x86_64_ubuntu.zip
             neolink_linux_x86_64_bookworm.zip
             neolink_linux_armhf.zip
