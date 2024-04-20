@@ -139,7 +139,7 @@ impl Discoverer {
                         tokio::task::yield_now().await;
                         match reader.next().await {
                             Some(Ok((BcUdp::Discovery(bcudp), addr))) => {
-                                log::info!("Got {:?} for {}", bcudp, addr);
+                                log::info!("Got discovery {:?} for {}", bcudp, addr);
                                 let tid = bcudp.tid;
                                 let mut needs_removal = false;
                                 if let (Some(sender), true) =
