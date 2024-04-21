@@ -70,8 +70,7 @@ RUN apt-get update && \
         gstreamer1.0-plugins-base \
         gstreamer1.0-plugins-good \
         gstreamer1.0-plugins-bad \
-        gstreamer1.0-libav \
-        valgrind && \
+        gstreamer1.0-libav && \
     apt-get clean -y && rm -rf /var/lib/apt/lists/*
 
 COPY --from=build \
@@ -83,11 +82,10 @@ RUN gst-inspect-1.0; \
     chmod +x "/usr/local/bin/neolink" && \
     "/usr/local/bin/neolink" --version && \
     mkdir -m 0700 /root/.config/ && \
-    mkdir -m 0700 /valgrind/
 
 
 ENV NEO_LINK_MODE="rtsp" NEO_LINK_PORT=8554
 
-CMD timeout 1800 valgrind --tool=massif --massif-out-file="/valgrind/massif.out.%p" /usr/local/bin/neolink ${NEO_LINK_MODE} --config /etc/neolink.toml
+CMD /usr/local/bin/neolink ${NEO_LINK_MODE} --config /etc/neolink.toml
 ENTRYPOINT ["/entrypoint.sh"]
 EXPOSE ${NEO_LINK_PORT}
