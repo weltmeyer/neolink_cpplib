@@ -318,7 +318,7 @@ pub struct Extension {
     pub check_pos: Option<u32>,
     /// Encrypted binary has this to verify successful decryption
     #[serde(rename = "checkValue", skip_serializing_if = "Option::is_none")]
-    pub check_value: Option<u32>,
+    pub check_value: Option<i32>,
     /// Used in newer encrypted payload packets
     #[serde(rename = "encryptLen", skip_serializing_if = "Option::is_none")]
     pub encrypt_len: Option<u32>,
@@ -1732,6 +1732,52 @@ fn test_binary_deser() {
     match b {
         Extension {
             binary_data: Some(1),
+            ..
+        } => {}
+        _ => panic!(),
+    }
+}
+
+#[test]
+fn test_enc3_extension() {
+    let _ = env_logger::builder().is_test(true).try_init();
+    let sample = indoc!(
+        r#"<?xml version="1.0\" encoding="UTF-8" ?>
+        <Extension version="1.1">
+        <encryptLen>1024</encryptLen>
+        <binaryData>1</binaryData>
+        <checkPos>0</checkPos>
+        <checkValue>1667510320</checkValue>
+        </Extension>
+        "#
+    );
+    let b = Extension::try_parse(sample.as_bytes()).unwrap();
+    match b {
+        Extension {
+            encrypt_len: Some(1024),
+            binary_data: Some(1),
+            check_pos: Some(0),
+            check_value: Some(1667510320),
+            ..
+        } => {}
+        _ => panic!(),
+    }
+
+    let sample = indoc!(
+        r#"
+    <?xml version="1.0" encoding="UTF-8" ?>
+    <Extension version="1.1">
+    <checkPos>0</checkPos>
+    <checkValue>-1211658</checkValue>
+    </Extension>
+    "#
+    );
+    let b = Extension::try_parse(sample.as_bytes()).unwrap();
+    match b {
+        Extension {
+            encrypt_len: Some(1024),
+            check_pos: Some(0),
+            check_value: Some(-1211658),
             ..
         } => {}
         _ => panic!(),
