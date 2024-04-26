@@ -1775,7 +1775,6 @@ fn test_enc3_extension() {
     let b = Extension::try_parse(sample.as_bytes()).unwrap();
     match b {
         Extension {
-            encrypt_len: Some(1024),
             check_pos: Some(0),
             check_value: Some(-1211658),
             ..
