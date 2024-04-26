@@ -582,9 +582,9 @@ impl StreamData {
                                                            while history.front().is_some_and(|di| di.ts < drop_time || di.ts > dts) || history.len() > BUFFER_SIZE {
                                                                history.pop_front();
                                                            }
-                                                           log::info!("history: {}", history.len());
+                                                           log::trace!("history: {}", history.len());
                                                            let debug: Vec<Duration> = history.iter().map(|f| f.ts).collect();
-                                                           log::info!("history ts: {:?}", debug);
+                                                           log::trace!("history ts: {:?}", debug);
                                                         });
                                                         recieved_iframe = true;
                                                         aud_keyframe = true;

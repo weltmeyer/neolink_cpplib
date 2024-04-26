@@ -560,7 +560,7 @@ impl UdpPayloadInner {
             self.packets_want += 1;
             self.thread_stream.feed(Ok(payload)).await?;
         }
-        log::info!("recieved: {}", self.recieved.len());
+        log::trace!("recieved: {}", self.recieved.len());
         log::trace!("Flush");
         self.socket_in.flush().await?;
         self.thread_stream.flush().await?;
@@ -618,7 +618,7 @@ impl UdpPayloadInner {
             }
         }
         self.ack_latency.feed_ack();
-        log::info!("sent: {}", self.sent.len());
+        log::trace!("sent: {}", self.sent.len());
     }
 }
 
