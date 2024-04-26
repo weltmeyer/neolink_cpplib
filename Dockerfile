@@ -81,7 +81,7 @@ COPY docker/entrypoint.sh /entrypoint.sh
 RUN gst-inspect-1.0; \
     chmod +x "/usr/local/bin/neolink" && \
     "/usr/local/bin/neolink" --version && \
-    mkdir -m 0700 /root/.config/ && \
+    mkdir -m 0700 /root/.config/
 
 
 ENV NEO_LINK_MODE="rtsp" NEO_LINK_PORT=8554
