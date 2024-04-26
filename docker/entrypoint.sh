@@ -8,4 +8,5 @@ trap exit_func TERM INT
 
 ulimit -n 1024
 
+echo "Running: ${*}"
 "$@"
