@@ -74,7 +74,7 @@ impl NeoCamThread {
                         },
                         Err(_) => {
                             // Timeout
-                            if missed_pings > 5 {
+                            if missed_pings < 5 {
                                 missed_pings += 1;
                                 continue;
                             } else {
