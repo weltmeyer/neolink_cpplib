@@ -139,7 +139,7 @@ impl Discoverer {
                         tokio::task::yield_now().await;
                         match reader.next().await {
                             Some(Ok((BcUdp::Discovery(bcudp), addr))) => {
-                                log::info!("Got discovery {:?} for {}", bcudp, addr);
+                                log::trace!("Got discovery {:?} for {}", bcudp, addr);
                                 let tid = bcudp.tid;
                                 let mut needs_removal = false;
                                 if let (Some(sender), true) =
@@ -159,7 +159,7 @@ impl Discoverer {
                             }
                             Some(Ok(bcudp)) => {
                                 // Only discovery packets should be possible atm
-                                log::info!("Got non Discovery during discovery: {:?}", bcudp);
+                                log::debug!("Got non Discovery during discovery: {:?}", bcudp);
                             }
                             Some(Err(e)) => {
                                 log::error!("Error on discovery socket: {:?}", e);
