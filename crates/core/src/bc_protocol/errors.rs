@@ -45,8 +45,13 @@ pub enum Error {
     },
 
     /// Raised when the camera responds with a status code over than OK
-    #[error("Camera responded with Service Unavaliable: {0}")]
-    CameraServiceUnavailable(u16),
+    #[error("Camera responded with Service Unavaliable: Msg of type {id} returned code {code}")]
+    CameraServiceUnavailable {
+        /// The message ID
+        id: u32,
+        // The return code this is usually 200 for OK and 400 for not yet ready and 500 for camera cannot comply or understand
+        code: u16,
+    },
 
     /// Raised when the camera responds with a status code over than OK during login
     #[error("Camera responded with Err during login")]

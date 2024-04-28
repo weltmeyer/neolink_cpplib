@@ -120,15 +120,17 @@ impl NeoInstance {
                     if let Some(cam) = camera.clone() {
                         let cam_ref = cam.as_ref();
                         let mut r = Err(anyhow!("No run"));
-                        for _ in 0..5 {
+                        for i in 0..5 {
                             r = task(cam_ref).await;
                             if let Err(e) = &r {
-                                log::trace!("- Task Result: {e:?}");
+                                log::debug!("- Task Error: {e:?}");
                             }
-                            if let Err(Some(neolink_core::Error::CameraServiceUnavailable(400))) = r.as_ref().map_err(|e| e.downcast_ref::<neolink_core::Error>()) {
+                            if let Err(Some(e @ neolink_core::Error::CameraServiceUnavailable{code: 400, ..})) = r.as_ref().map_err(|e| e.downcast_ref::<neolink_core::Error>()) {
                                 // Retryable without a reconnect
                                 // Usually occurs when camera is starting up
                                 // or the connection is initialising
+                                log::debug!("Got a 400 code for {e:?} retry {i}/5, ");
+
                                 sleep(Duration::from_secs(1)).await;
                                 continue;
                             } else {
