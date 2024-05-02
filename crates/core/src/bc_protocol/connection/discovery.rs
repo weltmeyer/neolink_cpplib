@@ -362,7 +362,7 @@ impl Discoverer {
             }),
         };
 
-        log::info!(
+        log::debug!(
             "Trying a direct connect to: {:?} with tid: {}",
             addr,
             msg.tid
@@ -374,17 +374,17 @@ impl Discoverer {
                     tid: _,
                     payload: UdpXml::D2cCr(D2cCr { did, cid, .. }),
                 } if cid == client_id => {
-                    log::info!("Got expected reply");
+                    log::trace!("Got expected reply");
                     Some((addr, did))
                 }
                 n => {
-                    log::info!("Got unexpected reply: {:?}", n);
+                    log::debug!("Got unexpected reply: {:?}", n);
                     None
                 }
             })
             .await?;
 
-        log::info!(
+        log::debug!(
             "Direct connect success at {:?} client: {}, device: {}",
             addr,
             client_id,
@@ -399,7 +399,7 @@ impl Discoverer {
         };
         self.keep_alive_device(tid, &result).await;
 
-        log::info!("Returning direct connect: {:?}", result);
+        log::debug!("Returning direct connect: {:?}", result);
         Ok(result)
     }
 

@@ -1781,4 +1781,23 @@ fn test_enc3_extension() {
         } => {}
         _ => panic!(),
     }
+
+    let sample = indoc!(
+        r#"
+        <?xml version="1.0" encoding="UTF-8" ?>
+        <Extension version="1.1">
+        <checkPos>0</checkPos>
+        <checkValue>-1821213800</checkValue>
+        </Extension>
+        "#
+    );
+    let b = Extension::try_parse(sample.as_bytes()).unwrap();
+    match b {
+        Extension {
+            check_pos: Some(0),
+            check_value: Some(-1821213800),
+            ..
+        } => {}
+        _ => panic!(),
+    }
 }
