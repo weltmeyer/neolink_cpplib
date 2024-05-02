@@ -157,7 +157,7 @@ fn build_unknown(bin: &Element, pattern: &str) -> Result<()> {
 
 fn build_h264(bin: &Element, stream_config: &StreamConfig) -> Result<AppSrc> {
     let buffer_size = buffer_size(stream_config.bitrate);
-    log::info!(
+    log::debug!(
         "buffer_size: {buffer_size}, bitrate: {}",
         stream_config.bitrate
     );

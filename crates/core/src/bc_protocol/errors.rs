@@ -49,7 +49,10 @@ pub enum Error {
     CameraServiceUnavailable {
         /// The message ID
         id: u32,
-        // The return code this is usually 200 for OK and 400 for not yet ready and 500 for camera cannot comply or understand
+        /// The return code this is usually
+        /// 200 for OK
+        /// 400 for not yet ready
+        /// 500 for camera cannot comply or understand
         code: u16,
     },
 
