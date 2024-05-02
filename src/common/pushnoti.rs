@@ -74,6 +74,31 @@ impl PushNotiThread {
             // let vapid_key = "????";
 
             let token_path = dirs::config_dir().map(|mut d| {
+                fs::create_dir(&d)
+                    .map_or_else(
+                        |res| {
+                            if let std::io::ErrorKind::AlreadyExists = res.kind() {
+                                Ok(())
+                            } else {
+                                Err(res)
+                            }
+                        },
+                        Ok,
+                    )
+                    .expect("Unable to create directory for push notification settings: {d:?}");
+                d.push("neolink");
+                fs::create_dir(&d)
+                    .map_or_else(
+                        |res| {
+                            if let std::io::ErrorKind::AlreadyExists = res.kind() {
+                                Ok(())
+                            } else {
+                                Err(res)
+                            }
+                        },
+                        Ok,
+                    )
+                    .expect("Unable to create directory for push notification settings: {d:?}");
                 d.push("./neolink_token.toml");
                 d
             });
