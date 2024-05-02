@@ -79,7 +79,7 @@ pub(super) async fn stream_main(
         let client_count = client_counter.create_deactivated().await?;
 
         // Client count affector
-        if curr_pause.on_motion {
+        if curr_pause.on_disconnect {
             let thread_name = name.clone();
             let client_count = client_counter.create_deactivated().await?;
             let thread_pause_affector_tx = pause_affector_tx.clone();
@@ -220,7 +220,7 @@ pub(super) async fn stream_main(
             });
         }
 
-        // This thread jsut keeps it active for 5s after an initial start to build the buffer
+        // This thread jsut keeps it active for 30s after an initial start to build the buffer
         let cancel = this_loop_cancel.clone();
         let mut init_activator = stream_instance.activator_handle().await;
         let init_camera = camera.clone();
@@ -232,7 +232,7 @@ pub(super) async fn stream_main(
                     let _ = init_camera
                         .run_task(|_| {
                             Box::pin(async move {
-                                sleep(Duration::from_secs(5)).await;
+                                sleep(Duration::from_secs(30)).await;
                                 AnyResult::Ok(())
                             })
                         })
@@ -253,6 +253,7 @@ pub(super) async fn stream_main(
                 v = async {
                     loop {
                         cur_count = *counter.get_counter().wait_for(|v| v != &cur_count).await?;
+                        log::trace!("cur_count: {cur_count:?}");
                     }
                 } => v,
             }
@@ -621,6 +622,7 @@ fn insert_filler<E, T: Stream<Item = Result<StampedData, E>> + Unpin>(
                 v
             },
             _ = tokio::time::sleep(delay) => {
+                log::trace!("Filling");
                 match format {
                     VidFormat::H264 => {
                         Some(Ok(StampedData {
@@ -771,7 +773,7 @@ async fn send_to_appsrc<E, T: Stream<Item = Result<StampedData, E>> + Unpin>(
     let mut pools: HashMap<usize, gstreamer::BufferPool> = Default::default();
     let mut keyframes_pushed = 0;
     let mut inited = false;
-    // appsrc.set_state(gstreamer::State::Paused).unwrap();
+    appsrc.set_state(gstreamer::State::Paused).unwrap();
 
     let (tx, mut rx) = tokio::sync::mpsc::channel::<StampedData>(2000);
 
@@ -790,7 +792,7 @@ async fn send_to_appsrc<E, T: Stream<Item = Result<StampedData, E>> + Unpin>(
                     ts_0 = data.ts;
                 }
                 let rt = data.ts - ts_0;
-                // log::info!("rt: {:?}", rt);
+                log::trace!("Sending frame with TimeStamp: {:?}", rt);
                 let buf = {
                     // let mut gst_buf = pool.acquire_buffer(None).unwrap();
                     let msg_size = data.data.len();
@@ -850,7 +852,7 @@ async fn send_to_appsrc<E, T: Stream<Item = Result<StampedData, E>> + Unpin>(
                         //     keyframes_pushed
                         // );
                         inited = true;
-                        // appsrc.set_state(gstreamer::State::Playing).unwrap();
+                        appsrc.set_state(gstreamer::State::Playing).unwrap();
                     } else if data.keyframe {
                         // log::info!(
                         //     "Buffer filling to {} of {} ({} %) in {} keyframes on {}",
