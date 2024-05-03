@@ -176,13 +176,18 @@ pub(crate) struct CameraConfig {
     pub(crate) update_time: bool,
 
     #[validate(range(
-        min = 0,
-        max = 500,
-        message = "Invalid buffer size",
-        code = "buffer_size"
+        min = 1,
+        max = 15000,
+        message = "Invalid buffer duration (it's in ms)",
+        code = "buffer_duration"
     ))]
-    #[serde(default = "default_buffer_size", alias = "size", alias = "buffer")]
-    pub(crate) buffer_size: usize,
+    /// Buffer duration in ms
+    #[serde(
+        default = "default_buffer_duration",
+        alias = "duration",
+        alias = "buffer"
+    )]
+    pub(crate) buffer_duration: u64,
 
     #[serde(default = "default_true", alias = "enable")]
     pub(crate) enabled: bool,
@@ -488,8 +493,8 @@ fn default_pause() -> PauseConfig {
     }
 }
 
-fn default_buffer_size() -> usize {
-    25
+fn default_buffer_duration() -> u64 {
+    3000
 }
 
 fn default_max_discovery_retries() -> usize {
