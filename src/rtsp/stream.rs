@@ -868,7 +868,7 @@ async fn send_to_appsrc<E, T: Stream<Item = Result<StampedData, E>> + Unpin>(
             }
             AnyResult::Ok(())
         })();
-        log::error!("r: {:?}", r);
+        log::trace!("r: {:?}", r);
         r
     });
 
@@ -879,6 +879,5 @@ async fn send_to_appsrc<E, T: Stream<Item = Result<StampedData, E>> + Unpin>(
             break;
         }
     }
-    log::error!("Exiting send_to_appsrc");
     Ok(())
 }
