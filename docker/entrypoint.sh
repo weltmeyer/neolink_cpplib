@@ -6,7 +6,7 @@ exit_func() {
 }
 trap exit_func TERM INT
 
-ulimit -n 1024
+ulimit -n 65535
 
 echo "Running: ${*}"
 "$@"
