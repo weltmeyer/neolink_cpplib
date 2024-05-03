@@ -5,6 +5,7 @@
 
 use anyhow::Context;
 use fcm_push_listener::*;
+use std::collections::{HashMap, HashSet};
 use std::{fs, sync::Arc};
 use tokio::{
     sync::{
@@ -21,8 +22,8 @@ use crate::AnyResult;
 
 pub(crate) struct PushNotiThread {
     pn_watcher: Arc<WatchSender<Option<PushNoti>>>,
-    registed_cameras: Vec<NeoInstance>,
-    received_ids: Vec<String>,
+    registed_cameras: HashMap<String, NeoInstance>,
+    received_ids: Arc<RwLock<HashSet<String>>>,
 }
 
 // The push notification
@@ -51,8 +52,8 @@ impl PushNotiThread {
 
         Ok(PushNotiThread {
             pn_watcher: Arc::new(pn_watcher),
-            registed_cameras: vec![],
-            received_ids: vec![],
+            registed_cameras: Default::default(),
+            received_ids: Arc::new(RwLock::new(Default::default())),
         })
     }
 
@@ -146,7 +147,7 @@ impl PushNotiThread {
             log::debug!("Push notification Listening");
             let thread_pn_watcher = self.pn_watcher.clone();
 
-            for instance in self.registed_cameras.iter() {
+            for (_, instance) in self.registed_cameras.iter() {
                 let uid = uid.clone();
                 let fcm_token = fcm_token.clone();
                 let instance = instance.clone();
@@ -170,7 +171,7 @@ impl PushNotiThread {
                 });
             }
 
-            let received_ids = Arc::new(RwLock::new(self.received_ids.clone()));
+            let received_ids = self.received_ids.clone();
             tokio::select! {
                 v = async {
                     loop {
@@ -187,7 +188,7 @@ impl PushNotiThread {
                                     id: message.persistent_id,
                                 }));
                             },
-                            received_ids.read().await.clone(),
+                            received_ids.read().await.iter().cloned().collect(),
                         );
                         let r = timeout(Duration::from_secs(60*5), listener.connect()).await;
                         match &r {
@@ -232,7 +233,7 @@ impl PushNotiThread {
                             PnRequest::Activate{instance, sender} => {
                                 let uid = uid.clone();
                                 let fcm_token = fcm_token.clone();
-                                self.registed_cameras.push(instance.clone());
+                                self.registed_cameras.insert(uid.clone(), instance.clone());
                                 tokio::task::spawn(async move {
                                     let r = instance.run_task(|camera| {
                                         let fcm_token = fcm_token.clone();
@@ -252,8 +253,8 @@ impl PushNotiThread {
                                 });
                             }
                             PnRequest::AddPushID{id} => {
-                                self.received_ids.push(id.clone());
-                                received_ids.write().await.push(id);
+                                log::trace!("Recived Push Notifcation of ID: {id}");
+                                received_ids.write().await.insert(id);
                             }
                         }
                     }
