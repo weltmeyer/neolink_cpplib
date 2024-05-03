@@ -86,7 +86,7 @@ async fn main() -> Result<()> {
         None => {
             warn!(
                 "Deprecated command line option. Please use: `neolink rtsp --config={:?}`",
-                config
+                conf_path
             );
             rtsp::main(rtsp::Opt {}, neo_reactor.clone()).await?;
         }
