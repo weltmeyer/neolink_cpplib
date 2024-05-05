@@ -7,7 +7,7 @@ use std::sync::Arc;
 use tokio::{
     sync::{broadcast::channel as broadcast, watch::channel as watch},
     task::JoinSet,
-    time::{interval, sleep, Duration},
+    time::{sleep, Duration},
 };
 use tokio_stream::{wrappers::BroadcastStream, Stream, StreamExt};
 use tokio_util::sync::CancellationToken;
@@ -413,6 +413,7 @@ async fn stream_run(
         let thread_vid = vid.clone();
         let mut thread_client_count = client_count.subscribe();
         let thread_format = stream_config.vid_format;
+        let (ts_tx, ts_rx) = tokio::sync::watch::channel(Duration::ZERO);
         // let fallback_time = Duration::from_secs(3);
         let framerate =
             Duration::from_millis(1000u64 / std::cmp::max(stream_config.fps as u64, 5u64));
@@ -425,18 +426,19 @@ async fn stream_run(
                     },
                     v = send_to_appsrc(
                         pad_vid(
-                            insert_filler(
+                            // insert_filler(
                                 frametime_stream(
-                                    // ensure_order(
+                                    sync_stream(
                                         wait_for_keyframe(
                                             vid_data_rx,
                                         ),
-                                    // ),
+                                        ts_tx,
+                                    ),
                                     framerate
                                 ),
-                                thread_format,
-                                framerate,
-                            ),
+                            //     thread_format,
+                            //     framerate,
+                            // ),
                             thread_format,
                         ),
                         &thread_vid
@@ -464,11 +466,12 @@ async fn stream_run(
                     },
                     v = send_to_appsrc(
                         frametime_stream(
-                            // ensure_order(
+                            hold_stream(
                                 wait_for_keyframe(
                                     aud_data_rx
                                 ),
-                            // ),
+                                ts_rx,
+                            ),
                             aud_framerate),
                         &thread_aud) => {
                         v
@@ -528,27 +531,44 @@ fn wait_for_keyframe<E, T: Stream<Item = Result<StampedData, E>> + Unpin>(
     })
 }
 
-#[allow(dead_code)]
 // Take a stream of stamped data and release them
-// in waves when a new key frame is found
-// this ensure that the last frame sent is always an IFrame
+// only when they are after a certain time stamp
+// This time stamp is sent via a shared watcher
+//
+// This is used to ensure that the audio does not run
+// ahead of the video too much
 fn hold_stream<E, T: Stream<Item = Result<StampedData, E>> + Unpin>(
     mut stream: T,
+    mut vid_ts: tokio::sync::watch::Receiver<Duration>,
 ) -> impl Stream<Item = AnyResult<StampedData>> + Unpin {
     Box::pin(async_stream::stream! {
-        let mut held_frames = vec![];
         while let Some(frame) = stream.next().await {
             if let Ok(frame) = frame {
-                if frame.keyframe {
-                    // Release
-                    for held_frame in held_frames.drain(..) {
-                        yield Ok(held_frame);
-                    }
+                if frame.ts >= *vid_ts.borrow() {
                     yield Ok(frame);
                 } else {
-                    //  Hold
-                    held_frames.push(frame);
+                    // Can't seem to throw an error here as it will cause
+                    // a borrow checker to hold over the await
+                    let _ = vid_ts.wait_for(|o| *o >= frame.ts).await;
+                    yield Ok(frame);
                 }
+            }
+        }
+    })
+}
+
+/// This is the counter part to [`hold_stream`]
+///
+/// It just updates the ts in the watcher
+fn sync_stream<E, T: Stream<Item = Result<StampedData, E>> + Unpin>(
+    mut stream: T,
+    vid_ts: tokio::sync::watch::Sender<Duration>,
+) -> impl Stream<Item = AnyResult<StampedData>> + Unpin {
+    Box::pin(async_stream::stream! {
+        while let Some(frame) = stream.next().await {
+            if let Ok(frame) = frame {
+                vid_ts.send_replace(frame.ts);
+                yield Ok(frame);
             }
         }
     })
@@ -590,23 +610,27 @@ fn ensure_order<E, T: Stream<Item = Result<StampedData, E>> + Unpin>(
 
 // Take a stream of stamped data pause until
 // it is time to display it
-#[allow(dead_code)]
 fn frametime_stream<E, T: Stream<Item = Result<StampedData, E>> + Unpin>(
     mut stream: T,
     expected_frame_rate: Duration,
 ) -> impl Stream<Item = AnyResult<StampedData>> + Unpin {
     Box::pin(async_stream::stream! {
-        let mut waiter = interval(expected_frame_rate);
-        waiter.set_missed_tick_behavior( tokio::time::MissedTickBehavior::Skip);
+        let mut ts_before = Duration::MAX;
         while let Some(frame) = stream.next().await {
             if let Ok(frame) = frame {
-                waiter.tick().await;
+                if frame.ts < ts_before {
+                    ts_before = frame.ts;
+                }
+                let wait = std::cmp::min(frame.ts.saturating_sub(ts_before), expected_frame_rate);
+                tokio::time::sleep(wait).await;
+                ts_before = frame.ts;
                 yield Ok(frame);
             }
         }
     })
 }
 
+#[allow(dead_code)]
 /// Insert filler into the video stream when no frames are comming
 /// this should help the stream not be considered dead while
 /// we wait for the reconnect
@@ -771,8 +795,7 @@ async fn send_to_appsrc<E, T: Stream<Item = Result<StampedData, E>> + Unpin>(
     let mut ts_0 = Duration::MAX;
     let mut wait_for_iframe = true;
     let mut pools: HashMap<usize, gstreamer::BufferPool> = Default::default();
-    let mut keyframes_pushed = 0;
-    let mut inited = false;
+    let mut paused = true;
     appsrc.set_state(gstreamer::State::Paused).unwrap();
 
     let (tx, mut rx) = tokio::sync::mpsc::channel::<StampedData>(2000);
@@ -792,7 +815,11 @@ async fn send_to_appsrc<E, T: Stream<Item = Result<StampedData, E>> + Unpin>(
                     ts_0 = data.ts;
                 }
                 let rt = data.ts - ts_0;
-                log::trace!("Sending frame with TimeStamp: {:?}", rt);
+                log::trace!(
+                    "Sending frame with TimeStamp: {:?} on {}",
+                    rt,
+                    appsrc.name()
+                );
                 let buf = {
                     // let mut gst_buf = pool.acquire_buffer(None).unwrap();
                     let msg_size = data.data.len();
@@ -839,31 +866,12 @@ async fn send_to_appsrc<E, T: Stream<Item = Result<StampedData, E>> + Unpin>(
                     }
                     Err(e) => Err(anyhow!("Error in streaming: {e:?}")),
                 }?;
-                if !inited {
-                    if keyframes_pushed > 1
-                        || appsrc.current_level_bytes() >= appsrc.max_bytes() * 2 / 3
-                    {
-                        // log::info!("=== Playing state on {}", appsrc.name());
-                        // log::info!(
-                        //     "Buffer filled to {} of {} ({} %) in {} keyframes",
-                        //     appsrc.current_level_bytes(),
-                        //     appsrc.max_bytes(),
-                        //     appsrc.current_level_bytes() * 100 / appsrc.max_bytes(),
-                        //     keyframes_pushed
-                        // );
-                        inited = true;
-                        appsrc.set_state(gstreamer::State::Playing).unwrap();
-                    } else if data.keyframe {
-                        // log::info!(
-                        //     "Buffer filling to {} of {} ({} %) in {} keyframes on {}",
-                        //     appsrc.current_level_bytes(),
-                        //     appsrc.max_bytes(),
-                        //     appsrc.current_level_bytes() * 100 / appsrc.max_bytes(),
-                        //     keyframes_pushed,
-                        //     appsrc.name()
-                        // );
-                        keyframes_pushed += 1;
-                    }
+                if appsrc.current_level_bytes() >= appsrc.max_bytes() * 2 / 3 && paused {
+                    appsrc.set_state(gstreamer::State::Playing).unwrap();
+                    paused = false;
+                } else if appsrc.current_level_bytes() <= appsrc.max_bytes() / 3 && !paused {
+                    appsrc.set_state(gstreamer::State::Paused).unwrap();
+                    paused = true;
                 }
             }
             AnyResult::Ok(())

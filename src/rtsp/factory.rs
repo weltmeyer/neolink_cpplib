@@ -229,7 +229,8 @@ fn build_h265(bin: &Element, stream_config: &StreamConfig) -> Result<AppSrc> {
 }
 
 fn build_aac(bin: &Element, stream_config: &StreamConfig) -> Result<AppSrc> {
-    let buffer_size = 512 * 6;
+    // Audio seems to run at about 800kbs
+    let buffer_size = 512 * 1416;
     let bin = bin
         .clone()
         .dynamic_cast::<Bin>()
@@ -294,7 +295,7 @@ fn build_aac(bin: &Element, stream_config: &StreamConfig) -> Result<AppSrc> {
 }
 
 fn build_adpcm(bin: &Element, block_size: u32, stream_config: &StreamConfig) -> Result<AppSrc> {
-    let buffer_size = 512 * 6;
+    let buffer_size = 512 * 1416;
     let bin = bin
         .clone()
         .dynamic_cast::<Bin>()

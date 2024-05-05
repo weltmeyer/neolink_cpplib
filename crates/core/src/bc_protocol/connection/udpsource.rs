@@ -368,6 +368,7 @@ impl UdpPayloadInner {
                                         written?;
                                     }
                                     Err(_) => {
+                                        log::trace!("Socket Error, attempting reconnect over a new one");
                                         // Socket is (maybe) broken
                                         // Seems to happen with network reconnects like over
                                         // a lossy cellular network
