@@ -22,6 +22,7 @@ use tokio::{
 };
 use tokio_stream::{wrappers::BroadcastStream, StreamExt};
 use tokio_util::sync::CancellationToken;
+use uuid::Uuid;
 
 pub(crate) struct Mqtt {
     cancel: CancellationToken,
@@ -125,7 +126,7 @@ impl<'a> MqttBackend<'a> {
     async fn run(&mut self) -> AnyResult<()> {
         log::trace!("Run MQTT Server");
         let mut mqttoptions = MqttOptions::new(
-            "Neolink".to_string(),
+            format!("Neolink{}", Uuid::new_v4()),
             &self.config.broker_addr,
             self.config.port,
         );
@@ -519,7 +520,7 @@ impl LastWillMqtt {
     ) -> AnyResult<Self> {
         log::trace!("Run MQTT Last Will");
         let mut mqttoptions = MqttOptions::new(
-            format!("NeolinkLastWill_{}", topic),
+            format!("NeolinkLastWill_{}_{}", topic, Uuid::new_v4()),
             &config.broker_addr,
             config.port,
         );
