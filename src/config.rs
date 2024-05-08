@@ -135,6 +135,8 @@ pub(crate) struct CameraConfig {
     pub(crate) camera_uid: Option<String>,
 
     pub(crate) username: String,
+
+    #[serde(alias = "pass")]
     pub(crate) password: Option<String>,
 
     #[serde(default = "default_stream")]
