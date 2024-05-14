@@ -430,7 +430,7 @@ pub struct FloodlightStatusList {
     #[serde(rename = "@version")]
     pub version: String,
     /// List of events
-    #[serde(rename = "FloodlightStatus")]
+    #[serde(default, rename = "FloodlightStatus")]
     pub floodlight_status_list: Vec<FloodlightStatus>,
 }
 
@@ -479,7 +479,7 @@ pub struct RfAlarmCfg {
 #[serde(rename = "timeBlockList")]
 pub struct TimeBlockList {
     /// List of time block entries which disable/enable the PIR at a time
-    #[serde(rename = "timeBlock")]
+    #[serde(default, rename = "timeBlock")]
     pub time_block: Vec<TimeBlock>,
 }
 
@@ -503,6 +503,7 @@ pub struct TimeBlock {
 /// AlarmHandle Xml
 pub struct AlarmHandle {
     /// Items in the alarm handle
+    #[serde(default)]
     pub item: Vec<AlarmHandleItem>,
 }
 
@@ -571,13 +572,13 @@ pub struct TalkAbility {
     #[serde(rename = "@version")]
     pub version: String,
     /// Duplexes known values `"FDX"`
-    #[serde(rename = "duplexList")]
+    #[serde(default, rename = "duplexList")]
     pub duplex_list: Vec<DuplexList>,
     /// audioStreamModes known values `"followVideoStream"`
-    #[serde(rename = "audioStreamModeList")]
+    #[serde(default, rename = "audioStreamModeList")]
     pub audio_stream_mode_list: Vec<AudioStreamModeList>,
     /// AudioConfigs contans the details of the audio to follow
-    #[serde(rename = "audioConfigList")]
+    #[serde(default, rename = "audioConfigList")]
     pub audio_config_list: Vec<AudioConfigList>,
 }
 
@@ -611,7 +612,7 @@ pub struct AlarmEventList {
     #[serde(rename = "@version")]
     pub version: String,
     /// List of events
-    #[serde(rename = "AlarmEvent")]
+    #[serde(default, rename = "AlarmEvent")]
     pub alarm_events: Vec<AlarmEvent>,
 }
 
@@ -670,6 +671,7 @@ pub struct PtzPreset {
 #[derive(PartialEq, Eq, Default, Debug, Deserialize, Serialize)]
 pub struct PresetList {
     /// List of Presets
+    #[serde(default)]
     pub preset: Vec<Preset>,
 }
 
@@ -693,7 +695,7 @@ pub struct BatteryList {
     #[serde(rename = "@version")]
     pub version: String,
     /// Battery info items
-    #[serde(rename = "BatteryInfo")]
+    #[serde(default, rename = "BatteryInfo")]
     pub battery_info: Vec<BatteryInfo>,
 }
 
@@ -768,7 +770,7 @@ pub struct AbilityInfo {
 #[derive(PartialEq, Eq, Default, Debug, Deserialize, Serialize)]
 pub struct AbilityInfoToken {
     /// Submodule for this ability info token
-    #[serde(rename = "subModule")]
+    #[serde(default, rename = "subModule")]
     pub sub_module: Vec<AbilityInfoSubModule>,
 }
 
@@ -842,7 +844,7 @@ pub struct Snap {
 #[derive(PartialEq, Eq, Default, Debug, Deserialize, Serialize)]
 pub struct StreamInfoList {
     /// The stream infos. There is usually only one of these
-    #[serde(rename = "StreamInfo")]
+    #[serde(default, rename = "StreamInfo")]
     pub stream_infos: Vec<StreamInfo>,
 }
 
@@ -853,7 +855,7 @@ pub struct StreamInfo {
     #[serde(rename = "channelBits")]
     pub channel_bits: u32,
     /// List of encode tabeles. These hold the actual stream data
-    #[serde(rename = "encodeTable")]
+    #[serde(default, rename = "encodeTable")]
     pub encode_tables: Vec<EncodeTable>,
 }
 
@@ -1250,7 +1252,7 @@ pub struct Support {
     #[serde(rename = "smartHome", skip_serializing_if = "Option::is_none")]
     pub smart_home: Option<SmartHome>,
     /// Support config for specific channels
-    #[serde(rename = "item")]
+    #[serde(default, rename = "item")]
     pub items: Vec<SupportItem>,
 }
 
@@ -1260,7 +1262,7 @@ pub struct SmartHome {
     /// Versionm
     pub version: u32,
     /// The smarthome items
-    #[serde(rename = "item")]
+    #[serde(default, rename = "item")]
     pub items: Vec<SmartHomeItem>,
 }
 
@@ -1798,6 +1800,30 @@ fn test_enc3_extension() {
             check_value: Some(-1821213800),
             ..
         } => {}
+        _ => panic!(),
+    }
+}
+
+#[test]
+fn test_empty_floodlight_status_list() {
+    let _ = env_logger::builder().is_test(true).try_init();
+    let sample = indoc!(
+        r#"<?xml version="1.0" encoding="UTF-8" ?>
+        <body>
+        <FloodlightStatusList version="1.1" />
+        </body>
+        "#
+    );
+    let b = BcXml::try_parse(sample.as_bytes()).unwrap();
+    match b {
+        BcXml {
+            floodlight_status_list:
+                Some(FloodlightStatusList {
+                    version,
+                    floodlight_status_list,
+                }),
+            ..
+        } if version == "1.1" && floodlight_status_list.is_empty() => {}
         _ => panic!(),
     }
 }
