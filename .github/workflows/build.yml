@@ -116,6 +116,7 @@ jobs:
           echo "GSTREAMER_1_0_ROOT_MSVC_X86_64=${GSTREAMER_1_0_ROOT_MSVC_X86_64}"
           echo "PKG_CONFIG_PATH=${PKG_CONFIG_PATH}"
           # pkg-config --variable pc_path pkg-config
+          export JEMALLOC_SYS_WITH_LG_PAGE=16
           cargo  build --release --all-features
       - uses: actions/upload-artifact@v4
         with:
