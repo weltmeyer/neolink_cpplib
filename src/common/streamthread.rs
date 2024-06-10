@@ -397,6 +397,8 @@ impl StreamData {
             users: UseCounter::new().await,
         };
 
+        let mut self_use = me.users.create_activated().await?; // Take out our own use handle until buffer is ready
+
         let cancel = me.cancel.clone();
         let vid = me.vid.clone();
         let aud = me.aud.clone();
@@ -626,15 +628,17 @@ impl StreamData {
                                                         log::trace!("Sent Vid Frame: {:?}", master_ts.read().await);
                                                     }
                                                     BcMedia::Aac(BcMediaAac{data, ..}) | BcMedia::Adpcm(BcMediaAdpcm{data,..}) if recieved_iframe => {
+                                                        let m_ts =  *master_ts.read().await;
                                                         let d = StampedData{
                                                             keyframe: aud_keyframe,
                                                             data: Arc::new(data),
-                                                            ts: *master_ts.read().await,
+                                                            ts: m_ts,
                                                         };
                                                         aud_keyframe = false;
                                                         let _ = aud_tx.send(d.clone())?;
+                                                        let last_vid_ts: Duration = vid_history.borrow().front().map(|vi| vi.ts).unwrap_or(m_ts);
                                                         aud_history.send_modify(|history| {
-                                                           let drop_time = d.ts.saturating_sub(buffer_duration);
+                                                           let drop_time = std::cmp::max(d.ts.saturating_sub(buffer_duration), last_vid_ts);
                                                            let dts = d.ts;
                                                            history.push_back(d);
                                                            while history.front().is_some_and(|di| di.ts < drop_time || di.ts > dts) || history.len() > buffer_size {
@@ -667,6 +671,11 @@ impl StreamData {
                                 }
                             },
                         }?;
+
+                        // Deactivate our use handle if the vid buffer is ready
+                        if vid_history.borrow().len() >= buffer_size {
+                            self_use.deactivate().await?;
+                        }
                     }
                 } => v,
             };

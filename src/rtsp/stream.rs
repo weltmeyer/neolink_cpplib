@@ -220,7 +220,7 @@ pub(super) async fn stream_main(
             });
         }
 
-        // This thread jsut keeps it active for 30s after an initial start to build the buffer
+        // This thread jsut keeps it active for 5s after an initial start to build the buffer
         let cancel = this_loop_cancel.clone();
         let mut init_activator = stream_instance.activator_handle().await;
         let init_camera = camera.clone();
@@ -232,7 +232,7 @@ pub(super) async fn stream_main(
                     let _ = init_camera
                         .run_task(|_| {
                             Box::pin(async move {
-                                sleep(Duration::from_secs(30)).await;
+                                sleep(Duration::from_secs(5)).await;
                                 AnyResult::Ok(())
                             })
                         })
