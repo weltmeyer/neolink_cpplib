@@ -155,7 +155,12 @@ fn build_unknown(bin: &Element, pattern: &str) -> Result<()> {
     Ok(())
 }
 
-fn build_h264(bin: &Element, stream_config: &StreamConfig) -> Result<AppSrc> {
+struct Linked {
+    appsrc: AppSrc,
+    output: Element,
+}
+
+fn pipe_h264(bin: &Element, stream_config: &StreamConfig) -> Result<Linked> {
     let buffer_size = buffer_size(stream_config.bitrate);
     log::debug!(
         "buffer_size: {buffer_size}, bitrate: {}",
@@ -184,17 +189,34 @@ fn build_h264(bin: &Element, stream_config: &StreamConfig) -> Result<AppSrc> {
     let queue = make_queue("source_queue", buffer_size)?;
     let parser = make_element("h264parse", "parser")?;
     // let stamper = make_element("h264timestamper", "stamper")?;
-    let payload = make_element("rtph264pay", "pay0")?;
-    bin.add_many([&source, &queue, &parser, &payload])?;
-    Element::link_many([&source, &queue, &parser, &payload])?;
+
+    bin.add_many([&source, &queue, &parser])?;
+    Element::link_many([&source, &queue, &parser])?;
 
     let source = source
         .dynamic_cast::<AppSrc>()
         .map_err(|_| anyhow!("Cannot convert appsrc"))?;
-    Ok(source)
+    Ok(Linked {
+        appsrc: source,
+        output: parser,
+    })
 }
 
-fn build_h265(bin: &Element, stream_config: &StreamConfig) -> Result<AppSrc> {
+fn build_h264(bin: &Element, stream_config: &StreamConfig) -> Result<AppSrc> {
+    let linked = pipe_h264(bin, stream_config)?;
+
+    let bin = bin
+        .clone()
+        .dynamic_cast::<Bin>()
+        .map_err(|_| anyhow!("Media source's element should be a bin"))?;
+
+    let payload = make_element("rtph264pay", "pay0")?;
+    bin.add_many([&payload])?;
+    Element::link_many([&linked.output, &payload])?;
+    Ok(linked.appsrc)
+}
+
+fn pipe_h265(bin: &Element, stream_config: &StreamConfig) -> Result<Linked> {
     let buffer_size = buffer_size(stream_config.bitrate);
     let bin = bin
         .clone()
@@ -218,17 +240,34 @@ fn build_h265(bin: &Element, stream_config: &StreamConfig) -> Result<AppSrc> {
     let queue = make_queue("source_queue", buffer_size)?;
     let parser = make_element("h265parse", "parser")?;
     // let stamper = make_element("h265timestamper", "stamper")?;
-    let payload = make_element("rtph265pay", "pay0")?;
-    bin.add_many([&source, &queue, &parser, &payload])?;
-    Element::link_many([&source, &queue, &parser, &payload])?;
+
+    bin.add_many([&source, &queue, &parser])?;
+    Element::link_many([&source, &queue, &parser])?;
 
     let source = source
         .dynamic_cast::<AppSrc>()
         .map_err(|_| anyhow!("Cannot convert appsrc"))?;
-    Ok(source)
+    Ok(Linked {
+        appsrc: source,
+        output: parser,
+    })
 }
 
-fn build_aac(bin: &Element, stream_config: &StreamConfig) -> Result<AppSrc> {
+fn build_h265(bin: &Element, stream_config: &StreamConfig) -> Result<AppSrc> {
+    let linked = pipe_h265(bin, stream_config)?;
+
+    let bin = bin
+        .clone()
+        .dynamic_cast::<Bin>()
+        .map_err(|_| anyhow!("Media source's element should be a bin"))?;
+
+    let payload = make_element("rtph265pay", "pay0")?;
+    bin.add_many([&payload])?;
+    Element::link_many([&linked.output, &payload])?;
+    Ok(linked.appsrc)
+}
+
+fn pipe_aac(bin: &Element, stream_config: &StreamConfig) -> Result<Linked> {
     // Audio seems to run at about 800kbs
     let buffer_size = 512 * 1416;
     let bin = bin
@@ -269,9 +308,8 @@ fn build_aac(bin: &Element, stream_config: &StreamConfig) -> Result<AppSrc> {
     }
 
     let encoder = make_element("audioconvert", "audencoder")?;
-    let payload = make_element("rtpL16pay", "pay1")?;
 
-    bin.add_many([&source, &queue, &parser, &decoder, &encoder, &payload])?;
+    bin.add_many([&source, &queue, &parser, &decoder, &encoder])?;
     if let Ok(fallback_switch) = fallback_switch.as_ref() {
         bin.add_many([&silence, fallback_switch])?;
         Element::link_many([
@@ -281,20 +319,36 @@ fn build_aac(bin: &Element, stream_config: &StreamConfig) -> Result<AppSrc> {
             &decoder,
             fallback_switch,
             &encoder,
-            &payload,
         ])?;
         Element::link_many([&silence, fallback_switch])?;
     } else {
-        Element::link_many([&source, &queue, &parser, &decoder, &encoder, &payload])?;
+        Element::link_many([&source, &queue, &parser, &decoder, &encoder])?;
     }
 
     let source = source
         .dynamic_cast::<AppSrc>()
         .map_err(|_| anyhow!("Cannot convert appsrc"))?;
-    Ok(source)
+    Ok(Linked {
+        appsrc: source,
+        output: encoder,
+    })
 }
 
-fn build_adpcm(bin: &Element, block_size: u32, stream_config: &StreamConfig) -> Result<AppSrc> {
+fn build_aac(bin: &Element, stream_config: &StreamConfig) -> Result<AppSrc> {
+    let linked = pipe_aac(bin, stream_config)?;
+
+    let bin = bin
+        .clone()
+        .dynamic_cast::<Bin>()
+        .map_err(|_| anyhow!("Media source's element should be a bin"))?;
+
+    let payload = make_element("rtpL16pay", "pay1")?;
+    bin.add_many([&payload])?;
+    Element::link_many([&linked.output, &payload])?;
+    Ok(linked.appsrc)
+}
+
+fn pipe_adpcm(bin: &Element, block_size: u32, stream_config: &StreamConfig) -> Result<Linked> {
     let buffer_size = 512 * 1416;
     let bin = bin
         .clone()
@@ -335,11 +389,10 @@ fn build_adpcm(bin: &Element, block_size: u32, stream_config: &StreamConfig) -> 
     let queue = make_queue("audqueue", buffer_size)?;
     let decoder = make_element("decodebin", "auddecoder")?;
     let encoder = make_element("audioconvert", "audencoder")?;
-    let payload = make_element("rtpL16pay", "pay1")?;
+    let encoder_out = encoder.clone();
 
-    bin.add_many([&source, &queue, &decoder, &encoder, &payload])?;
+    bin.add_many([&source, &queue, &decoder, &encoder])?;
     Element::link_many([&source, &queue, &decoder])?;
-    Element::link_many([&encoder, &payload])?;
     decoder.connect_pad_added(move |_element, pad| {
         let sink_pad = encoder
             .static_pad("sink")
@@ -351,7 +404,116 @@ fn build_adpcm(bin: &Element, block_size: u32, stream_config: &StreamConfig) -> 
     let source = source
         .dynamic_cast::<AppSrc>()
         .map_err(|_| anyhow!("Cannot convert appsrc"))?;
-    Ok(source)
+    Ok(Linked {
+        appsrc: source,
+        output: encoder_out,
+    })
+}
+
+fn build_adpcm(bin: &Element, block_size: u32, stream_config: &StreamConfig) -> Result<AppSrc> {
+    let linked = pipe_adpcm(bin, block_size, stream_config)?;
+
+    let bin = bin
+        .clone()
+        .dynamic_cast::<Bin>()
+        .map_err(|_| anyhow!("Media source's element should be a bin"))?;
+
+    let payload = make_element("rtpL16pay", "pay1")?;
+    bin.add_many([&payload])?;
+    Element::link_many([&linked.output, &payload])?;
+    Ok(linked.appsrc)
+}
+
+fn pipe_silence(bin: &Element, stream_config: &StreamConfig) -> Result<Linked> {
+    // Audio seems to run at about 800kbs
+    let buffer_size = 512 * 1416;
+    let bin = bin
+        .clone()
+        .dynamic_cast::<Bin>()
+        .map_err(|_| anyhow!("Media source's element should be a bin"))?;
+    log::debug!("Building Silence pipeline");
+    let source = make_element("appsrc", "audsrc")?
+        .dynamic_cast::<AppSrc>()
+        .map_err(|_| anyhow!("Cannot cast to appsrc."))?;
+
+    source.set_is_live(false);
+    source.set_block(false);
+    source.set_min_latency(1000 / (stream_config.fps as i64));
+    source.set_property("emit-signals", false);
+    source.set_max_bytes(buffer_size as u64);
+    source.set_do_timestamp(false);
+    source.set_stream_type(AppStreamType::Seekable);
+
+    let source = source
+        .dynamic_cast::<Element>()
+        .map_err(|_| anyhow!("Cannot cast back"))?;
+
+    let sink_queue = make_queue("audsinkqueue", buffer_size)?;
+    let sink = make_element("fakesink", "silence_sink")?;
+
+    let silence = make_element("audiotestsrc", "audsilence")?;
+    silence.set_property_from_str("wave", "silence");
+    let src_queue = make_queue("audsinkqueue", buffer_size)?;
+    let encoder = make_element("audioconvert", "audencoder")?;
+
+    bin.add_many([&source, &sink_queue, &sink, &silence, &src_queue, &encoder])?;
+
+    Element::link_many([&source, &sink_queue, &sink])?;
+
+    Element::link_many([&silence, &src_queue, &encoder])?;
+
+    let source = source
+        .dynamic_cast::<AppSrc>()
+        .map_err(|_| anyhow!("Cannot convert appsrc"))?;
+    Ok(Linked {
+        appsrc: source,
+        output: encoder,
+    })
+}
+
+struct AppSrcPair {
+    vid: AppSrc,
+    aud: Option<AppSrc>,
+}
+
+fn build_mpegts(bin: &Element, stream_config: &StreamConfig) -> Result<AppSrcPair> {
+    let buffer_size = buffer_size(stream_config.bitrate);
+    log::debug!(
+        "buffer_size: {buffer_size}, bitrate: {}",
+        stream_config.bitrate
+    );
+
+    // VID
+    let vid_link = match stream_config.vid_format {
+        VidFormat::H264 => pipe_h264(bin, stream_config)?,
+        VidFormat::H265 => pipe_h265(bin, stream_config)?,
+        VidFormat::None => unreachable!(),
+    };
+
+    // AUD
+    let aud_link = match stream_config.aud_format {
+        AudFormat::Aac => pipe_aac(bin, stream_config)?,
+        AudFormat::Adpcm(block) => pipe_adpcm(bin, block, stream_config)?,
+        AudFormat::None => pipe_silence(bin, stream_config)?,
+    };
+
+    let bin = bin
+        .clone()
+        .dynamic_cast::<Bin>()
+        .map_err(|_| anyhow!("Media source's element should be a bin"))?;
+
+    // MUX
+    let muxer = make_element("mpegtsmux", "mpeg_muxer")?;
+    let rtp = make_element("rtpmp2tpay", "pay0")?;
+
+    bin.add_many([&muxer, &rtp])?;
+    Element::link_many([&vid_link.output, &muxer, &rtp])?;
+    Element::link_many([&aud_link.output, &muxer])?;
+
+    Ok(AppSrcPair {
+        vid: vid_link.appsrc,
+        aud: Some(aud_link.appsrc),
+    })
 }
 
 // Convenice funcion to make an element or provide a message
