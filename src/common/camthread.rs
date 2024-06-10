@@ -37,7 +37,9 @@ impl NeoCamThread {
     }
     async fn run_camera(&mut self, config: &CameraConfig) -> AnyResult<()> {
         let name = config.name.clone();
+        log::trace!("Attempting connection with config: {config:?}");
         let camera = Arc::new(connect_and_login(config).await?);
+        log::trace!("  - Connected");
 
         sleep(Duration::from_secs(2)).await; // Delay a little since some calls will error if camera is waking up
         update_camera_time(&camera, &name, config.update_time).await?;
@@ -60,13 +62,16 @@ impl NeoCamThread {
                 let mut missed_pings = 0;
                 loop {
                     interval.tick().await;
+                    log::trace!("Sending ping");
                     match timeout(Duration::from_secs(5), camera.get_linktype()).await {
                         Ok(Ok(_)) => {
+                            log::trace!("Ping reply");
                             missed_pings = 0;
                             continue
                         },
-                        Ok(Err(neolink_core::Error::UnintelligibleReply { .. })) => {
+                        Ok(Err(neolink_core::Error::UnintelligibleReply { reply, why })) => {
                             // Camera does not support pings just wait forever
+                            log::trace!("Pings not supported: {reply:?}: {why}");
                             futures::future::pending().await
                         },
                         Ok(Err(e)) => {
@@ -78,8 +83,8 @@ impl NeoCamThread {
                                 missed_pings += 1;
                                 continue;
                             } else {
-                                log::debug!("Timed out waiting for camera ping reply. Assuming unsupported");
-                                futures::future::pending().await
+                                log::error!("Timed out waiting for camera ping reply");
+                                break Err(anyhow::anyhow!("Timed out waiting for camera ping reply"));
                             }
                         }
                     }
@@ -121,6 +126,7 @@ impl NeoCamThread {
                     None
                 }
                 Ok(_) = state.wait_for(|state| matches!(state, NeoCamThreadState::Disconnected)) => {
+                    log::trace!("State changed to disconnect");
                     None
                 }
                 v = self.run_camera(&config) => {
@@ -133,6 +139,7 @@ impl NeoCamThread {
                 // If None go back and reload NOW
                 //
                 // This occurs if there was a config change
+                log::trace!("Config change or Manual disconnect");
                 continue;
             }
 
@@ -150,6 +157,7 @@ impl NeoCamThread {
             match result {
                 Ok(()) => {
                     // Normal shutdown
+                    log::trace!("Normal camera shutdown");
                     self.cancel.cancel();
                     return Ok(());
                 }
