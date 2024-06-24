@@ -30,6 +30,7 @@ RUN  echo "TARGETPLATFORM: ${TARGETPLATFORM}"; \
   else \
     echo "Building from scratch"; \
     apt-get update && \
+        apt-get upgrade -y && \
         apt-get install -y --no-install-recommends \
           build-essential \
           openssl \
@@ -58,6 +59,7 @@ LABEL maintainer="$OWNER"
 
 # hadolint ignore=DL3008
 RUN apt-get update && \
+    apt-get upgrade -y && \
     apt-get install -y --no-install-recommends \
         openssl \
         dnsutils \
@@ -83,9 +85,9 @@ RUN gst-inspect-1.0; \
     "/usr/local/bin/neolink" --version && \
     mkdir -m 0700 /root/.config/
 
-
 ENV NEO_LINK_MODE="rtsp" NEO_LINK_PORT=8554
 
 CMD /usr/local/bin/neolink "${NEO_LINK_MODE}" --config /etc/neolink.toml
 ENTRYPOINT ["/entrypoint.sh"]
 EXPOSE ${NEO_LINK_PORT}
+
