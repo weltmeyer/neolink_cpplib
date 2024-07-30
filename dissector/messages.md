@@ -247,7 +247,7 @@ Message have zero to two payloads.
     - Payload
 
       Body is binary. This binary represents an embedded stream which should
-      is detailed in [mediapacket.md](dissector/mediapacket.md).
+      is detailed in [mediapacket.md](mediapacket.md).
 
 - 4: `<Preview>` (stop)
 
