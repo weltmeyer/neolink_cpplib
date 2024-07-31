@@ -471,11 +471,14 @@ fn pipe_silence(bin: &Element, stream_config: &StreamConfig) -> Result<Linked> {
     })
 }
 
+#[allow(dead_code)]
 struct AppSrcPair {
     vid: AppSrc,
     aud: Option<AppSrc>,
 }
 
+#[allow(dead_code)]
+/// Experimental build a stream of MPEGTS
 fn build_mpegts(bin: &Element, stream_config: &StreamConfig) -> Result<AppSrcPair> {
     let buffer_size = buffer_size(stream_config.bitrate);
     log::debug!(

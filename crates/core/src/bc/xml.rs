@@ -1699,18 +1699,17 @@ fn test_deviceinfo_partial_deser() {
 "#
     );
 
-    // Needs to ignore all the other crap that we don't care about
     let b = BcXml::try_parse(sample.as_bytes()).unwrap();
     match b {
         BcXml {
             device_info:
                 Some(DeviceInfo {
                     resolution:
-                        Resolution {
+                        Some(Resolution {
                             width: 3840,
                             height: 2160,
                             ..
-                        },
+                        }),
                     ..
                 }),
             ..
