@@ -42,7 +42,9 @@ impl NeoCamThread {
         log::trace!("  - Connected");
 
         sleep(Duration::from_secs(2)).await; // Delay a little since some calls will error if camera is waking up
-        update_camera_time(&camera, &name, config.update_time).await?;
+        if let Err(e) = update_camera_time(&camera, &name, config.update_time).await {
+            log::warn!("Could not set camera time, (perhaps missing on this camera of your login in not an admin): {e:?}");
+        }
         sleep(Duration::from_secs(2)).await; // Delay a little since some calls will error if camera is waking up
 
         self.camera_watch.send_replace(Arc::downgrade(&camera));
