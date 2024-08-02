@@ -298,7 +298,9 @@ async fn listen_on_camera(camera: NeoInstance, mqtt_instance: MqttInstance) -> R
                 let camera_motion = camera.clone();
                 let mqtt_motion = mqtt_instance.resubscribe().await?;
 
+                #[cfg(feature = "pushnoti")]
                 let camera_pn = camera.clone();
+                #[cfg(feature = "pushnoti")]
                 let mqtt_pn = mqtt_instance.resubscribe().await?;
 
                 let camera_snap = camera.clone();
@@ -530,27 +532,32 @@ async fn listen_on_camera(camera: NeoInstance, mqtt_instance: MqttInstance) -> R
                     }, if config.enable_battery => v,
                     // Handle the push notification messages
                     v = async {
-                        let mut pn = camera_pn.push_notifications().await?;
-                        let mut prev_noti = None;
-                        loop {
-                            let v = async {
-                                let noti = pn.wait_for(|noti| noti != &prev_noti && noti.is_some()).await.with_context(|| {
-                                    format!("{}: PushNoti Watch Dropped", camera_name)
-                                })?.clone();
-                                mqtt_pn.send_message("status/notification", &noti.as_ref().unwrap().message, true).await.with_context(|| {
-                                    format!("{}: Failed to publish push notification", camera_name)
-                                })?;
-                                prev_noti = noti;
-                                AnyResult::Ok(())
-                            }.await;
-                            match v.map_err(|e| e.downcast::<neolink_core::Error>()) {
-                                Err(Ok(neolink_core::Error::UnintelligibleReply{..})) => futures::future::pending().await,
-                                Ok(()) => AnyResult::Ok(()),
-                                Err(Ok(e)) => Err(e.into()),
-                                Err(Err(e)) => Err (e),
-                            }?;
+                        #[cfg(feature = "pushnoti")]
+                        {
+                            let mut pn = camera_pn.push_notifications().await?;
+                            let mut prev_noti = None;
+                            loop {
+                                let v = async {
+                                    let noti = pn.wait_for(|noti| noti != &prev_noti && noti.is_some()).await.with_context(|| {
+                                        format!("{}: PushNoti Watch Dropped", camera_name)
+                                    })?.clone();
+                                    mqtt_pn.send_message("status/notification", &noti.as_ref().unwrap().message, true).await.with_context(|| {
+                                        format!("{}: Failed to publish push notification", camera_name)
+                                    })?;
+                                    prev_noti = noti;
+                                    AnyResult::Ok(())
+                                }.await;
+                                match v.map_err(|e| e.downcast::<neolink_core::Error>()) {
+                                    Err(Ok(neolink_core::Error::UnintelligibleReply{..})) => futures::future::pending().await,
+                                    Ok(()) => AnyResult::Ok(()),
+                                    Err(Ok(e)) => Err(e.into()),
+                                    Err(Err(e)) => Err (e),
+                                }?;
+                            }
                         }
-                    } => v,
+                        #[cfg(not(feature = "pushnoti"))]
+                        unreachable!()
+                    }, if cfg!(feature = "pushnoti") => v,
                     // Handle the floodlight task activation
                     v = async {
                         let flt_status = camera_floodlight_tasks.run_passive_task(|cam| Box::pin(async move {

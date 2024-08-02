@@ -7,18 +7,25 @@
 use anyhow::{anyhow, Context};
 use futures::TryFutureExt;
 use std::sync::{Arc, Weak};
+#[cfg(feature = "pushnoti")]
+use tokio::sync::watch::channel as watch;
 use tokio::{
     sync::{
-        mpsc::Sender as MpscSender, oneshot::channel as oneshot, watch::channel as watch,
-        watch::Receiver as WatchReceiver,
+        mpsc::Sender as MpscSender, oneshot::channel as oneshot, watch::Receiver as WatchReceiver,
     },
     time::{sleep, Duration},
 };
 use tokio_util::sync::CancellationToken;
 
-use super::{MdState, NeoCamCommand, NeoCamThreadState, Permit, PushNoti, StreamInstance};
+#[cfg(feature = "pushnoti")]
+use super::PushNoti;
+#[cfg(feature = "gstreamer")]
+use super::StreamInstance;
+use super::{MdState, NeoCamCommand, NeoCamThreadState, Permit};
 use crate::{config::CameraConfig, AnyResult, Result};
-use neolink_core::bc_protocol::{BcCamera, StreamKind};
+use neolink_core::bc_protocol::BcCamera;
+#[cfg(feature = "gstreamer")]
+use neolink_core::bc_protocol::StreamKind;
 
 /// This instance is the primary interface used throughout the app
 ///
@@ -225,6 +232,7 @@ impl NeoInstance {
         }
     }
 
+    #[cfg(feature = "gstreamer")]
     pub(crate) async fn stream(&self, name: StreamKind) -> Result<StreamInstance> {
         let (instance_tx, instance_rx) = oneshot();
         self.camera_control
@@ -233,6 +241,7 @@ impl NeoInstance {
         Ok(instance_rx.await?)
     }
 
+    #[cfg(feature = "gstreamer")]
     #[allow(dead_code)]
     pub(crate) async fn low_stream(&self) -> Result<Option<StreamInstance>> {
         let (instance_tx, instance_rx) = oneshot();
@@ -242,6 +251,7 @@ impl NeoInstance {
         Ok(instance_rx.await?)
     }
 
+    #[cfg(feature = "gstreamer")]
     #[allow(dead_code)]
     pub(crate) async fn high_stream(&self) -> Result<Option<StreamInstance>> {
         let (instance_tx, instance_rx) = oneshot();
@@ -251,6 +261,7 @@ impl NeoInstance {
         Ok(instance_rx.await?)
     }
 
+    #[cfg(feature = "gstreamer")]
     #[allow(dead_code)]
     pub(crate) async fn streams(&self) -> Result<Vec<StreamInstance>> {
         let (instance_tx, instance_rx) = oneshot();
@@ -260,6 +271,7 @@ impl NeoInstance {
         Ok(instance_rx.await?)
     }
 
+    #[cfg(feature = "pushnoti")]
     pub(crate) async fn uid(&self) -> Result<String> {
         let (reply_tx, reply_rx) = oneshot();
         self.camera_control
@@ -268,6 +280,7 @@ impl NeoInstance {
         Ok(reply_rx.await?)
     }
 
+    #[cfg(feature = "pushnoti")]
     pub(crate) async fn push_notifications(&self) -> Result<WatchReceiver<Option<PushNoti>>> {
         let uid = self.uid().await?;
         let (instance_tx, instance_rx) = oneshot();

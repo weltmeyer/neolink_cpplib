@@ -63,6 +63,7 @@ impl UseCounter {
         Ok(res)
     }
 
+    #[cfg(feature = "gstreamer")]
     pub(crate) async fn create_deactivated(&self) -> Result<Permit> {
         Ok(Permit::new(self))
     }
@@ -87,6 +88,7 @@ pub(crate) struct Permit {
 }
 
 impl Permit {
+    #[cfg(feature = "gstreamer")]
     pub(crate) fn subscribe(&self) -> Self {
         Self {
             is_active: false,
@@ -141,6 +143,7 @@ impl Permit {
         Ok(())
     }
 
+    #[cfg(feature = "gstreamer")]
     pub(crate) fn get_counter(&self) -> WatchReceiver<u32> {
         self.value.clone()
     }

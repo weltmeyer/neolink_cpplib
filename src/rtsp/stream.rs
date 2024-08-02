@@ -143,40 +143,43 @@ pub(super) async fn stream_main(
             });
 
             // Push notfications
-            let mut pn = camera.push_notifications().await?;
-            let mut curr_pn = None;
-            let thread_name = name.clone();
-            let thread_pause_affector_tx = pause_affector_tx.clone();
-            let cancel = this_loop_cancel.clone();
-            set.spawn(async move {
-                tokio::select! {
-                    _ = cancel.cancelled() => AnyResult::Ok(()),
-                    v = async {
-                        loop {
-                            curr_pn = pn
-                                .wait_for(|pn| pn != &curr_pn && pn.is_some())
-                                .await?
-                                .clone();
-                            log::info!("{}: Enabling Push Notification", thread_name);
-                            thread_pause_affector_tx.send_modify(|current| {
-                                current.push = true;
-                            });
-                            tokio::select! {
-                                v = pn.wait_for(|pn| pn != &curr_pn && pn.is_some()) => {
-                                    v?;
-                                    // If another PN during wait then go back to wait more
-                                    continue;
+            #[cfg(feature = "pushnoti")]
+            {
+                let mut pn = camera.push_notifications().await?;
+                let mut curr_pn = None;
+                let thread_name = name.clone();
+                let thread_pause_affector_tx = pause_affector_tx.clone();
+                let cancel = this_loop_cancel.clone();
+                set.spawn(async move {
+                    tokio::select! {
+                        _ = cancel.cancelled() => AnyResult::Ok(()),
+                        v = async {
+                            loop {
+                                curr_pn = pn
+                                    .wait_for(|pn| pn != &curr_pn && pn.is_some())
+                                    .await?
+                                    .clone();
+                                log::info!("{}: Enabling Push Notification", thread_name);
+                                thread_pause_affector_tx.send_modify(|current| {
+                                    current.push = true;
+                                });
+                                tokio::select! {
+                                    v = pn.wait_for(|pn| pn != &curr_pn && pn.is_some()) => {
+                                        v?;
+                                        // If another PN during wait then go back to wait more
+                                        continue;
+                                    }
+                                    _ = sleep(Duration::from_secs(30)) => {}
                                 }
-                                _ = sleep(Duration::from_secs(30)) => {}
+                                log::info!("{}: Pausing Push Notification", thread_name);
+                                thread_pause_affector_tx.send_modify(|current| {
+                                    current.push = false;
+                                });
                             }
-                            log::info!("{}: Pausing Push Notification", thread_name);
-                            thread_pause_affector_tx.send_modify(|current| {
-                                current.push = false;
-                            });
-                        }
-                    } => v,
-                }
-            });
+                        } => v,
+                    }
+                });
+            }
         }
 
         if curr_pause.on_motion || curr_pause.on_disconnect {
