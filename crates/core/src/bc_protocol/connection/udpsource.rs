@@ -350,19 +350,18 @@ impl UdpPayloadInner {
                     loop {
                         break tokio::select!{
                             _ = recv_timeout.as_mut() => {
-                                log::trace!("DroppedConnection: Timeout");
-                                Err(Error::DroppedConnection)
+                                Err(Error::BcUdpTimeout)
                             }
                             packet = inner.next() => {
                                 log::trace!("Cam->App");
-                                let packet = packet.ok_or(Error::DroppedConnection)??;
+                                let packet = packet.ok_or(Error::BcUdpDropReciver)??;
                                 recv_timeout.as_mut().reset(Instant::now() + Duration::from_secs(TIME_OUT));
-                                // let packet = socket_rx.next().await.ok_or(Error::DroppedConnection)??;
-                                socket_out_tx.try_send(packet).map_err(|_| Error::DroppedConnection)?;
+                                // let packet = socket_rx.next().await.ok_or(Error::BcUdpDropReciver)??;
+                                socket_out_tx.try_send(packet).map_err(|_| Error::BcUdpDropReciver)?;
                                 continue;
                             },
                             packet = socket_in_rx.next() => {
-                                let packet = packet.ok_or(Error::DroppedConnection)?;
+                                let packet = packet.ok_or(Error::BcUdpDropSender)?;
                                 match tokio::time::timeout(tokio::time::Duration::from_millis(250), inner.send((packet, thread_camera_addr))).await {
                                     Ok(written) => {
                                         written?;
@@ -372,8 +371,8 @@ impl UdpPayloadInner {
                                         // Socket is (maybe) broken
                                         // Seems to happen with network reconnects like over
                                         // a lossy cellular network
-                                        let stream = Arc::new(tokio::time::timeout(tokio::time::Duration::from_millis(250), connect_try_port(inner.inner.get_ref().local_addr()?.port())).await.map_err(|_| Error::DroppedConnection)??);
-                                        inner = tokio::time::timeout(tokio::time::Duration::from_millis(250), BcUdpSource::new_from_socket(stream, inner.addr)).await.map_err(|_| Error::DroppedConnection)??;
+                                        let stream = Arc::new(tokio::time::timeout(tokio::time::Duration::from_millis(250), connect_try_port(inner.inner.get_ref().local_addr()?.port())).await.map_err(|_| Error::BcUdpReconnectTimeout)??);
+                                        inner = tokio::time::timeout(tokio::time::Duration::from_millis(250), BcUdpSource::new_from_socket(stream, inner.addr)).await.map_err(|_| Error::BcUdpReconnectTimeout)??;
 
                                         // Inform the camera that we are the same client
                                         //
@@ -492,10 +491,7 @@ impl UdpPayloadInner {
                 log::trace!("App->Camera");
                 // Incomming from application
                 // Outgoing on socket
-                if v.is_none() {
-                    log::trace!("DroppedConnection: self.thread_sink.next(): {:?}", v);
-                }
-                let item = v.ok_or(Error::DroppedConnection)?;
+                let item = v.ok_or(Error::BcUdpDropSender)?;
 
                 for chunk in item.chunks(MTU - UDPDATA_HEADER_SIZE) {
                     let udp_data = UdpData {
@@ -513,10 +509,7 @@ impl UdpPayloadInner {
                 log::trace!("Camera->App");
                 // Incomming from socket
                 // Outgoing to application
-                if v.is_none() {
-                    log::trace!("DroppedConnection: self.socket_out.next()");
-                }
-                let (item, addr) = v.ok_or(Error::DroppedConnection)?;
+                let (item, addr) = v.ok_or(Error::BcUdpDropReciver)?;
                 if addr == camera_addr {
                     match item {
                         BcUdp::Discovery(UdpDiscovery{
@@ -658,7 +651,7 @@ impl UdpPayloadSource {
                         if payload_inner.thread_stream.is_closed() {
                             log::trace!("payload_inner.thread_stream.is_closed");
                             payload_inner.thread_sink.close();
-                            return Err(Error::DroppedConnection);
+                            return Err(Error::BcUdpPayloadDroppedInner);
                         }
                         log::trace!("Calling inner");
                         let res = payload_inner.run().await;
