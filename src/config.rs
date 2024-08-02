@@ -5,8 +5,8 @@ use regex::Regex;
 use serde::{Deserialize, Serialize};
 use std::clone::Clone;
 use std::collections::HashSet;
+use validator::Validate;
 use validator::ValidationError;
-use validator_derive::Validate;
 
 static RE_TLS_CLIENT_AUTH: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"^(none|request|require)$").unwrap());
@@ -17,7 +17,7 @@ static RE_MAXENC_SRC: Lazy<Regex> = Lazy::new(|| {
 
 #[derive(Debug, Deserialize, Serialize, Validate, Clone, PartialEq)]
 pub(crate) struct Config {
-    #[validate]
+    #[validate(nested)]
     pub(crate) cameras: Vec<CameraConfig>,
 
     #[serde(rename = "bind", default = "default_bind_addr")]
@@ -44,7 +44,7 @@ pub(crate) struct Config {
     #[serde(default = "default_tls_client_auth")]
     pub(crate) tls_client_auth: String,
 
-    #[validate]
+    #[validate(nested)]
     #[serde(default)]
     pub(crate) users: Vec<UserConfig>,
 }
@@ -148,11 +148,11 @@ pub(crate) struct CameraConfig {
     #[serde(default = "default_channel_id", alias = "channel")]
     pub(crate) channel_id: u8,
 
-    #[validate]
+    #[validate(nested)]
     #[serde(default = "default_mqtt")]
     pub(crate) mqtt: MqttConfig,
 
-    #[validate]
+    #[validate(nested)]
     #[serde(default = "default_pause")]
     pub(crate) pause: PauseConfig,
 
