@@ -1,8 +1,3 @@
-# Development has moved
-
-Neolink is now maintained at https://github.com/QuantumEntangledAndy/neolink as I no longer have time to dedicate to development.
-Please direct your thanks and bug reports over there!
-
 # Neolink
 
 ![CI](https://github.com/QuantumEntangledAndy/neolink/workflows/CI/badge.svg)
@@ -41,7 +36,7 @@ features not yet in upstream master.
 - Protocol more closely follows official reolink format
   - Possibly can handle more simulatenous connections
 - More ways to connect to the camera. Including Relaying through reolink
-servers
+  servers
 - Camera battery levels can be displayed in the log
 
 ## Installation
@@ -72,9 +67,10 @@ sudo apt install \
 ```
 
 - **Windows**: You may also need to
-[install openssl](https://wiki.openssl.org/index.php/Binaries)
+  [install openssl](https://wiki.openssl.org/index.php/Binaries)
 - **Macos**: You may also need to
-[install openssl](https://wiki.openssl.org/index.php/Binaries) or `brew install openssl@1.1`
+  [install openssl](https://wiki.openssl.org/index.php/Binaries) or
+  `brew install openssl@1.1`
 - **Ubuntu/Debian**: Install the `libssl` package
 
 Make a config file see below.
@@ -119,7 +115,7 @@ using the terminal in the same folder the neolink binary is in.
 ### Discovery
 
 To connect to a camera using a UID we need to find the IP address of the camera
- with that UID
+with that UID
 
 The IP is discovered with four methods
 
@@ -254,7 +250,7 @@ Status Messages:
   there will be no `/status/preview` message. Only published when
   `enable_preview` is true in the config
 - `/status/floodlight_tasks` The current status of the floodlight tasks
-   used updated every 2s by default
+  used updated every 2s by default
 
 Query Messages:
 
@@ -262,7 +258,7 @@ Query Messages:
 - `/query/pir` Request that the camera reports its pir status
 - `/query/ptz/preset` Request that the camera reports its PTZ presets
 - `/query/preview` Request that the camera post a base64 encoded jpeg
-    of the stream to `/status/preview` now, ignoring the timer
+  of the stream to `/status/preview` now, ignoring the timer
 
 ### Controlling RTSP from MQTT
 
@@ -461,8 +457,11 @@ docker pull quantumentangledandy/neolink
 # network=host, notably macos lacks this option.
 docker run --network host --volume=$PWD/config.toml:/etc/neolink.toml quantumentangledandy/neolink
 ```
-#### Environmental Variables 
-There are currently 2 environmental variables available as part of the container: 
+
+#### Environmental Variables
+
+There are currently 2 environmental variables available as part of the container:
+
 - `NEO_LINK_MODE`: defaults to `"rtsp"` if not set, other options are "mqtt" or "mqtt-rtsp".
 - `NEO_LINK_PORT`: defaults to `8554`, set this to your required port value.
 
