@@ -59,13 +59,13 @@ pub(crate) struct MqttServerConfig {
 
     pub(crate) port: u16,
 
-    #[serde(default)]
+    #[serde(default, skip_serializing)]
     pub(crate) credentials: Option<(String, String)>,
 
-    #[serde(default)]
+    #[serde(default, skip_serializing)]
     pub(crate) ca: Option<std::path::PathBuf>,
 
-    #[serde(default)]
+    #[serde(default, skip_serializing)]
     pub(crate) client_auth: Option<(std::path::PathBuf, std::path::PathBuf)>,
 }
 
@@ -139,7 +139,7 @@ pub(crate) struct CameraConfig {
 
     pub(crate) username: String,
 
-    #[serde(alias = "pass")]
+    #[serde(alias = "pass", skip_serializing, default)]
     pub(crate) password: Option<String>,
 
     #[serde(default = "default_stream")]
@@ -226,8 +226,8 @@ pub(crate) struct UserConfig {
     #[serde(alias = "username")]
     pub(crate) name: String,
 
-    #[serde(alias = "password")]
-    pub(crate) pass: String,
+    #[serde(alias = "password", skip_serializing, default)]
+    pub(crate) pass: Option<String>,
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone, Validate, PartialEq, Eq)]

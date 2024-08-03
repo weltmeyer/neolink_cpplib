@@ -211,7 +211,40 @@ pub(crate) async fn main(_: Opt, reactor: NeoReactor) -> Result<()> {
                                 .await?;
                             continue;
                         }
-                        let config = config?;
+                        let curr_config = thread_config.borrow().clone();
+                        let mut config = config?;
+
+                        // Fill in skipped passwords
+                        if let (Some(mqtt), Some(curr_mqtt)) = (config.mqtt.as_mut(), curr_config.mqtt.as_ref()) {
+                            if mqtt.credentials.is_none() {
+                                mqtt.credentials = curr_mqtt.credentials.clone();
+                            }
+                            if mqtt.ca.is_none() {
+                                mqtt.ca = curr_mqtt.ca.clone();
+                            }
+                            if mqtt.client_auth.is_none() {
+                                mqtt.client_auth = curr_mqtt.client_auth.clone();
+                            }
+                        }
+                        for cam in config.cameras.iter_mut() {
+                            let name = cam.name.clone();
+                            let cur_cam = curr_config.cameras.iter().find(|c| c.name == name);
+                            if let Some(cur_cam) = cur_cam.as_ref() {
+                                if cam.password.is_none() {
+                                    cam.password = cur_cam.password.clone();
+                                }
+                            }
+                        }
+                        for user in config.users.iter_mut() {
+                            let name = user.name.clone();
+                            let cur_user = curr_config.users.iter().find(|c| c.name == name);
+                            if let Some(cur_user) = cur_user.as_ref() {
+                                if user.pass.is_none() {
+                                    user.pass = cur_user.pass.clone();
+                                }
+                            }
+                        }
+                        // Passwords should now be restored if they were not set
 
                         let validate = config.validate().with_context(|| {
                             format!("Failed to validate the MQTT {:?} config file", msg.topic)

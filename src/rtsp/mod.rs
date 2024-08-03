@@ -233,7 +233,8 @@ async fn apply_users(rtsp: &NeoRtspServer, curr_users: &HashSet<UserConfig>) -> 
     // Add those missing
     for user in curr_users.iter() {
         log::debug!("Adding user {} to rtsp server", user.name);
-        rtsp.add_user(&user.name, &user.pass).await?;
+        rtsp.add_user(&user.name, &user.pass.clone().unwrap_or_default())
+            .await?;
     }
     // Remove unused
     let rtsp_users = rtsp.get_users().await?;
