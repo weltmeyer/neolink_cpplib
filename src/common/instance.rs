@@ -19,13 +19,10 @@ use tokio_util::sync::CancellationToken;
 
 #[cfg(feature = "pushnoti")]
 use super::PushNoti;
-#[cfg(feature = "gstreamer")]
-use super::StreamInstance;
 use super::{MdState, NeoCamCommand, NeoCamThreadState, Permit};
 use crate::{config::CameraConfig, AnyResult, Result};
 use neolink_core::bc_protocol::BcCamera;
 #[cfg(feature = "gstreamer")]
-use neolink_core::bc_protocol::StreamKind;
 
 /// This instance is the primary interface used throughout the app
 ///
@@ -230,45 +227,6 @@ impl NeoInstance {
                 },
             };
         }
-    }
-
-    #[cfg(feature = "gstreamer")]
-    pub(crate) async fn stream(&self, name: StreamKind) -> Result<StreamInstance> {
-        let (instance_tx, instance_rx) = oneshot();
-        self.camera_control
-            .send(NeoCamCommand::Stream(name, instance_tx))
-            .await?;
-        Ok(instance_rx.await?)
-    }
-
-    #[cfg(feature = "gstreamer")]
-    #[allow(dead_code)]
-    pub(crate) async fn low_stream(&self) -> Result<Option<StreamInstance>> {
-        let (instance_tx, instance_rx) = oneshot();
-        self.camera_control
-            .send(NeoCamCommand::LowStream(instance_tx))
-            .await?;
-        Ok(instance_rx.await?)
-    }
-
-    #[cfg(feature = "gstreamer")]
-    #[allow(dead_code)]
-    pub(crate) async fn high_stream(&self) -> Result<Option<StreamInstance>> {
-        let (instance_tx, instance_rx) = oneshot();
-        self.camera_control
-            .send(NeoCamCommand::HighStream(instance_tx))
-            .await?;
-        Ok(instance_rx.await?)
-    }
-
-    #[cfg(feature = "gstreamer")]
-    #[allow(dead_code)]
-    pub(crate) async fn streams(&self) -> Result<Vec<StreamInstance>> {
-        let (instance_tx, instance_rx) = oneshot();
-        self.camera_control
-            .send(NeoCamCommand::Streams(instance_tx))
-            .await?;
-        Ok(instance_rx.await?)
     }
 
     #[cfg(feature = "pushnoti")]

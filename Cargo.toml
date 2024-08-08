@@ -13,7 +13,6 @@ members = [
 
 [dependencies]
 anyhow = "1.0.70"
-async-stream = {version = "0.3.5", optional = true}
 base64 = "0.22.0"
 byte-slice-cast = {version = "1.2.2", optional = true}
 bytes = "1.6.0"
@@ -54,7 +53,6 @@ gstreamer = [
   "dep:gstreamer-app",
   "dep:gstreamer-rtsp",
   "dep:gstreamer-rtsp-server",
-  "dep:async-stream",
   "dep:byte-slice-cast",
   "dep:crossbeam-channel"
 ]

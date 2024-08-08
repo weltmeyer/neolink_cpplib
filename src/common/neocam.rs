@@ -23,27 +23,15 @@ use super::{
     MdRequest, MdState, NeoCamMdThread, NeoCamThread, NeoCamThreadState, NeoInstance, Permit,
     UseCounter,
 };
-#[cfg(feature = "gstreamer")]
-use super::{NeoCamStreamThread, StreamInstance, StreamRequest};
 #[cfg(feature = "pushnoti")]
 use super::{PnRequest, PushNoti};
 use crate::{config::CameraConfig, AnyResult, Result};
 use neolink_core::bc_protocol::BcCamera;
 #[cfg(feature = "gstreamer")]
-use neolink_core::bc_protocol::StreamKind;
-
 #[allow(dead_code)]
 pub(crate) enum NeoCamCommand {
     HangUp,
     Instance(OneshotSender<Result<NeoInstance>>),
-    #[cfg(feature = "gstreamer")]
-    Stream(StreamKind, OneshotSender<StreamInstance>),
-    #[cfg(feature = "gstreamer")]
-    HighStream(OneshotSender<Option<StreamInstance>>),
-    #[cfg(feature = "gstreamer")]
-    LowStream(OneshotSender<Option<StreamInstance>>),
-    #[cfg(feature = "gstreamer")]
-    Streams(OneshotSender<Vec<StreamInstance>>),
     Motion(OneshotSender<WatchReceiver<MdState>>),
     Config(OneshotSender<WatchReceiver<CameraConfig>>),
     Disconnect(OneshotSender<()>),
@@ -71,8 +59,6 @@ impl NeoCam {
         let (commander_tx, commander_rx) = mpsc(100);
         let (watch_config_tx, watch_config_rx) = watch(config.clone());
         let (camera_watch_tx, camera_watch_rx) = watch(Weak::new());
-        #[cfg(feature = "gstreamer")]
-        let (stream_request_tx, stream_request_rx) = mpsc(100);
         let (md_request_tx, md_request_rx) = mpsc(100);
         let (state_tx, state_rx) = watch(NeoCamThreadState::Connected);
         let (uid_tx, uid_rx) = watch(config.camera_uid.clone());
@@ -96,7 +82,6 @@ impl NeoCam {
         let sender_cancel = me.cancel.clone();
         let mut commander_rx = ReceiverStream::new(commander_rx);
         #[cfg(feature = "gstreamer")]
-        let strict = config.strict;
         let thread_commander_tx = commander_tx.clone();
         let thread_watch_config_rx = watch_config_rx.clone();
         #[cfg(feature = "pushnoti")]
@@ -123,40 +108,6 @@ impl NeoCam {
                                 );
                                 let _ = result.send(instance);
                             }
-                            #[cfg(feature = "gstreamer")]
-                            NeoCamCommand::Stream(name, sender) => {
-                                stream_request_tx.send(
-                                    StreamRequest::GetOrInsert {
-                                        name,
-                                        sender,
-                                        strict,
-                                    }
-                                ).await?;
-                            },
-                            #[cfg(feature = "gstreamer")]
-                            NeoCamCommand::HighStream(sender) => {
-                                stream_request_tx.send(
-                                    StreamRequest::High {
-                                        sender,
-                                    }
-                                ).await?;
-                            },
-                            #[cfg(feature = "gstreamer")]
-                            NeoCamCommand::LowStream(sender) => {
-                                stream_request_tx.send(
-                                    StreamRequest::Low {
-                                        sender,
-                                    }
-                                ).await?;
-                            },
-                            #[cfg(feature = "gstreamer")]
-                            NeoCamCommand::Streams(sender) => {
-                                stream_request_tx.send(
-                                    StreamRequest::All {
-                                        sender,
-                                    }
-                                ).await?;
-                            },
                             NeoCamCommand::Motion(sender) => {
                                 md_request_tx.send(
                                     MdRequest::Get {
@@ -230,23 +181,6 @@ impl NeoCam {
         )
         .await;
         me.set.spawn(async move { cam_thread.run().await });
-
-        // This thread maintains the streams
-        #[cfg(feature = "gstreamer")]
-        {
-            let stream_instance = instance.subscribe().await?;
-            let stream_cancel = me.cancel.clone();
-            let mut stream_thread =
-                NeoCamStreamThread::new(stream_request_rx, stream_instance).await?;
-            me.set.spawn(async move {
-                tokio::select! {
-                    _ = stream_cancel.cancelled() => AnyResult::Ok(()),
-                    v = stream_thread.run() => {
-                        v
-                    },
-                }
-            });
-        }
 
         // This thread monitors the motion
         let md_instance = instance.subscribe().await?;
