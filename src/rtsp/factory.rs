@@ -1,4 +1,3 @@
-use futures::TryFutureExt;
 use gstreamer::ClockTime;
 use std::{collections::HashMap, time::Duration};
 
@@ -168,38 +167,13 @@ pub(super) async fn make_factory(
                     let name = name.clone();
                     tokio::task::spawn(async move {
                         clear_bin(&element)?;
-                        log::debug!("{name}::{stream}: Starting camera");
+                        log::trace!("{name}::{stream}: Starting camera");
 
                         // Start the camera
-                        let (media_tx, mut media_rx) = tokio::sync::mpsc::channel(100);
                         let config = camera.config().await?.borrow().clone();
-                        let strict = config.strict;
-                        let thread_camera = camera.clone();
-                        tokio::task::spawn(
-                            tokio::task::spawn(async move {
-                                thread_camera
-                                    .run_task(move |cam| {
-                                        let media_tx = media_tx.clone();
-                                        Box::pin(async move {
-                                            let mut media_stream =
-                                                cam.start_video(stream, 0, strict).await?;
-                                            log::debug!("Camera started");
-                                            while let Ok(media) = media_stream.get_data().await? {
-                                                log::debug!("Sending media frame");
-                                                media_tx.send(media).await?;
-                                            }
-                                            AnyResult::Ok(())
-                                        })
-                                    })
-                                    .await
-                            })
-                            .and_then(|res| async move {
-                                log::debug!("Camera finished streaming: {res:?}");
-                                Ok(())
-                            }),
-                        );
+                        let mut media_rx = camera.stream_while_live(stream).await?;
 
-                        log::debug!("{name}::{stream}: Learning camera stream type");
+                        log::trace!("{name}::{stream}: Learning camera stream type");
                         // Learn the camera data type
                         let mut buffer = vec![];
                         let mut frame_count = 0usize;
@@ -207,7 +181,6 @@ pub(super) async fn make_factory(
                         let mut stream_config = StreamConfig::new(&camera, stream).await?;
                         while let Some(media) = media_rx.recv().await {
                             stream_config.update_from_media(&media);
-
                             buffer.push(media);
                             if frame_count > 10
                                 || (stream_config.vid_type.is_some()
@@ -218,7 +191,7 @@ pub(super) async fn make_factory(
                             frame_count += 1;
                         }
 
-                        log::debug!("{name}::{stream}: Building the pipeline");
+                        log::trace!("{name}::{stream}: Building the pipeline");
                         // Build the right video pipeline
                         let vid_src = match stream_config.vid_type.as_ref() {
                             Some(VideoType::H264) => {
@@ -263,7 +236,7 @@ pub(super) async fn make_factory(
                             );
                         }
 
-                        log::debug!("{name}::{stream}: Sending pipeline to gstreamer");
+                        log::trace!("{name}::{stream}: Sending pipeline to gstreamer");
                         // Send the pipeline back to the factory so it can start
                         let _ = reply.send(element);
 
@@ -274,7 +247,7 @@ pub(super) async fn make_factory(
                             let mut vid_ts = 0u32;
                             let mut pools = Default::default();
 
-                            log::debug!("{name}::{stream}: Sending buffered frames");
+                            log::trace!("{name}::{stream}: Sending buffered frames");
                             for buffered in buffer.drain(..) {
                                 send_to_sources(
                                     buffered,
@@ -287,7 +260,7 @@ pub(super) async fn make_factory(
                                 )?;
                             }
 
-                            log::debug!("{name}::{stream}: Sending new frames");
+                            log::trace!("{name}::{stream}: Sending new frames");
                             while let Some(data) = media_rx.blocking_recv() {
                                 let r = send_to_sources(
                                     data,
@@ -303,7 +276,7 @@ pub(super) async fn make_factory(
                                 }
                                 r?;
                             }
-                            log::info!("All media recieved");
+                            log::trace!("All media recieved");
                             AnyResult::Ok(())
                         });
                         AnyResult::Ok(())
@@ -355,7 +328,7 @@ fn send_to_sources(
                 .duration()
                 .expect("Could not calculate ADPCM duration");
             if let Some(aud_src) = aud_src.as_ref() {
-                log::debug!("Sending ADPCM: {:?}", Duration::from_micros(*aud_ts as u64));
+                log::trace!("Sending ADPCM: {:?}", Duration::from_micros(*aud_ts as u64));
                 send_to_appsrc(
                     aud_src,
                     adpcm.data,
@@ -368,7 +341,7 @@ fn send_to_sources(
         BcMedia::Iframe(BcMediaIframe { data, .. })
         | BcMedia::Pframe(BcMediaPframe { data, .. }) => {
             if let Some(vid_src) = vid_src.as_ref() {
-                log::debug!("Sending VID: {:?}", Duration::from_micros(*vid_ts as u64));
+                log::trace!("Sending VID: {:?}", Duration::from_micros(*vid_ts as u64));
                 send_to_appsrc(vid_src, data, Duration::from_micros(*vid_ts as u64), pools)?;
             }
             const MICROSECONDS: u32 = 1000000;
@@ -408,31 +381,37 @@ fn send_to_appsrc(
         }
     }
     let buf = {
-        // let mut gst_buf = pool.acquire_buffer(None).unwrap();
         let msg_size = data.len();
+
+        // Get or create a pool of this len
         let pool = pools.entry(msg_size).or_insert_with_key(|size| {
             let pool = gstreamer::BufferPool::new();
             let mut pool_config = pool.config();
-            pool_config.set_params(None, (*size) as u32, 8, 0);
+            // Set a max buffers to ensure we don't grow in memory endlessly
+            pool_config.set_params(None, (*size) as u32, 8, 32);
             pool.set_config(pool_config).unwrap();
-            // let (allocator, alloc_parms) = pool.allocator().unwrap();
             pool.set_active(true).unwrap();
             pool
         });
-        let mut gst_buf = pool.acquire_buffer(None).unwrap();
-        // let mut gst_buf = gstreamer::Buffer::with_size(data.data.len()).unwrap();
-        {
-            let gst_buf_mut = gst_buf.get_mut().unwrap();
+
+        // Get a buffer from the pool and then copy in the data
+        let gst_buf = {
+            let mut new_buf = pool.acquire_buffer(None).unwrap();
+            let gst_buf_mut = new_buf.get_mut().unwrap();
             let time = ClockTime::from_useconds(ts.as_micros() as u64);
-            // gst_buf_mut.set_dts(ClockTime::from_useconds(dts));
             gst_buf_mut.set_dts(time);
             gst_buf_mut.set_pts(time);
             let mut gst_buf_data = gst_buf_mut.map_writable().unwrap();
             gst_buf_data.copy_from_slice(data.as_slice());
-        }
+            drop(gst_buf_data);
+            new_buf
+        };
+
+        // Return the new buffer with the data
         gst_buf
     };
 
+    // Push buffer into the appsrc
     match appsrc.push_buffer(buf) {
         Ok(_) => {
             // log::info!(
@@ -453,6 +432,7 @@ fn send_to_appsrc(
         }
         Err(e) => Err(anyhow!("Error in streaming: {e:?}")),
     }?;
+    // Check if we need to pause
     if appsrc.current_level_bytes() >= appsrc.max_bytes() * 2 / 3
         && matches!(appsrc.current_state(), gstreamer::State::Paused)
     {
