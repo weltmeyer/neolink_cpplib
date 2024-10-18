@@ -132,6 +132,12 @@ pub struct BcXml {
     /// For changing rtmp server port
     #[serde(rename = "OnvifPort", skip_serializing_if = "Option::is_none")]
     pub onvif_port: Option<OnvifPort>,
+    /// Email for setting the email notifications
+    #[serde(rename = "Email", skip_serializing_if = "Option::is_none")]
+    pub email: Option<Email>,
+    /// EmailTask for turning the email notifications on/off
+    #[serde(rename = "EmailTask", skip_serializing_if = "Option::is_none")]
+    pub email_task: Option<EmailTask>,
 }
 
 impl BcXml {
@@ -490,8 +496,9 @@ pub struct TimeBlockList {
 pub struct TimeBlock {
     /// Whether to enable or disable for this time block
     pub enable: u8,
-    /// The day of the week for this block
-    pub weekDay: String,
+    /// The day of the week for this block, Monday, Tuesday, Etc
+    #[serde(rename = "weekDay")]
+    pub week_day: String,
     /// Time to start this block
     #[serde(rename = "beginHour")]
     pub begin_hour: u8,
@@ -930,7 +937,7 @@ pub struct FloodlightTask {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub brightness_min: Option<u32>,
     /// Schedule fot auto floodlight
-    pub schedule: Schedule,
+    pub schedule: ScheduleFloodLight,
     /// Threshold settings for light sensor to consider nightime
     #[serde(rename = "lightSensThreshold")]
     pub light_sens_threshold: LightSensThreshold,
@@ -947,7 +954,7 @@ pub struct FloodlightTask {
 
 /// Schedule for Floodlight Task
 #[derive(PartialEq, Eq, Default, Debug, Deserialize, Serialize)]
-pub struct Schedule {
+pub struct ScheduleFloodLight {
     /// startHour
     #[serde(rename = "startHour")]
     pub start_hour: u32,
@@ -1476,6 +1483,87 @@ pub struct OnvifPort {
     /// The enable status known values are `1`, `0`
     #[serde(skip_serializing_if = "Option::is_none")]
     pub enable: Option<u32>,
+}
+
+/// Email settings for notificaitons
+#[derive(PartialEq, Eq, Default, Debug, Deserialize, Serialize, Clone)]
+pub struct Email {
+    /// XML Version
+    #[serde(rename = "@version")]
+    pub version: String,
+    /// SMTP server address
+    #[serde(rename = "smtpServer")]
+    pub smtp_server: String,
+    /// SMTP username
+    #[serde(rename = "userName")]
+    pub user_name: String,
+    /// SMTP password
+    pub password: String,
+    /// Send email address
+    pub address1: String,
+    /// Send email address can be empty
+    pub address2: String,
+    /// Send email address can be empty
+    pub address3: String,
+    /// 465
+    #[serde(rename = "smtpPort")]
+    pub smtp_port: u16,
+    /// Name of recipient to use on the email
+    #[serde(rename = "sendNickname")]
+    pub send_nickname: String,
+    /// Observed value `1`
+    pub attachment: u8,
+    /// Observed value `picture`, `video`
+    #[serde(rename = "attachmentType", skip_serializing_if = "Option::is_none")]
+    pub attachment_type: Option<String>,
+    /// Observed value `withText`
+    #[serde(rename = "textType")]
+    pub text_type: String,
+    /// Observed value `1`
+    pub ssl: u8,
+    /// Observed value `30`
+    pub interval: u32,
+    /// Max length of message. Observed value `127`
+    ///   Read Only
+    #[serde(rename = "senderMaxLen", skip_serializing_if = "Option::is_none")]
+    pub sender_max_len: Option<u32>,
+}
+
+/// EmailTask settings that controls the times/enables the email
+/// notifications
+#[derive(PartialEq, Eq, Default, Debug, Deserialize, Serialize)]
+pub struct EmailTask {
+    /// XML Version
+    #[serde(rename = "@version")]
+    pub version: String,
+    /// Channel number
+    #[serde(rename = "channelId")]
+    pub channel_id: u8,
+    /// 1 for enable 0 for disable
+    #[serde(rename = "enable")]
+    pub enable: u8,
+    /// The list of schedule to turn on/off the email notifications
+    #[serde(rename = "ScheduleList", skip_serializing_if = "Option::is_none")]
+    pub schedule_list: Option<ScheduleList>,
+}
+
+/// List of schedule items for turning on/off the notifications
+#[derive(PartialEq, Eq, Default, Debug, Deserialize, Serialize)]
+pub struct ScheduleList {
+    /// List of schedules
+    #[serde(rename = "Schedule")]
+    pub schedule: Schedule,
+}
+
+/// Schedule item for turning on/off the notifications
+#[derive(PartialEq, Eq, Default, Debug, Deserialize, Serialize)]
+pub struct Schedule {
+    /// The alarm type. Observed values: `MD`
+    #[serde(rename = "alarmType")]
+    pub alarm_type: String,
+    /// The list of time blocks
+    #[serde(rename = "timeBlockList")]
+    pub time_block_list: TimeBlockList,
 }
 
 /// Convience function to return the xml version used throughout the library

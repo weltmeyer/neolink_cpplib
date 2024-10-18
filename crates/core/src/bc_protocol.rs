@@ -16,6 +16,7 @@ mod abilityinfo;
 mod battery;
 mod connection;
 mod credentials;
+mod email;
 mod errors;
 mod floodlight;
 mod keepalive;

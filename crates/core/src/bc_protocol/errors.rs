@@ -89,8 +89,8 @@ pub enum Error {
     BcUdpTimeout,
 
     /// Raised when a BcUdp incomming connection is dropped
-    #[error("BcUDP reciver dropped")]
-    BcUdpDropReciver,
+    #[error("BcUDP reciver dropped: {0:?}")]
+    BcUdpDropReciver(BcUdpDropReciverKind),
 
     /// Raised when a BcUdp outgoing connection is dropped
     #[error("BcUDP sender dropped")]
@@ -234,6 +234,12 @@ pub enum Error {
     /// A generic catch all error
     #[error("Other error: {0}")]
     OtherString(String),
+}
+
+#[derive(Debug, Clone)]
+pub enum BcUdpDropReciverKind {
+    NoneRecieved,
+    SendFailed(String),
 }
 
 impl From<std::io::Error> for Error {

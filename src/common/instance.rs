@@ -435,7 +435,7 @@ impl NeoInstance {
                         loop {
                             let noti: Option<PushNoti> = pn.borrow_and_update().clone();
                             if let Some(noti) = noti {
-                                if noti.message.contains("MOTION") {
+                                if noti.message.contains("Motion Alert from") {
                                     log::info!(
                                         "{thread_name}::{stream:?}: Push Notification Recieved"
                                     );

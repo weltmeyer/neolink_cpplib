@@ -1,6 +1,7 @@
 use super::DiscoveryResult;
 use crate::bc::codex::BcCodex;
 use crate::bc::model::*;
+use crate::bc_protocol::errors::BcUdpDropReciverKind;
 use crate::bcudp::codex::BcUdpCodex;
 use crate::bcudp::{model::*, xml::*};
 use crate::{Credentials, Error, Result};
@@ -354,10 +355,10 @@ impl UdpPayloadInner {
                             }
                             packet = inner.next() => {
                                 log::trace!("Cam->App");
-                                let packet = packet.ok_or(Error::BcUdpDropReciver)??;
+                                let packet = packet.ok_or(Error::BcUdpDropReciver(BcUdpDropReciverKind::NoneRecieved))??;
                                 recv_timeout.as_mut().reset(Instant::now() + Duration::from_secs(TIME_OUT));
                                 // let packet = socket_rx.next().await.ok_or(Error::BcUdpDropReciver)??;
-                                socket_out_tx.try_send(packet).map_err(|_| Error::BcUdpDropReciver)?;
+                                socket_out_tx.try_send(packet).map_err(|e| Error::BcUdpDropReciver(BcUdpDropReciverKind::SendFailed(format!("{e:?}"))))?;
                                 continue;
                             },
                             packet = socket_in_rx.next() => {
@@ -509,7 +510,7 @@ impl UdpPayloadInner {
                 log::trace!("Camera->App");
                 // Incomming from socket
                 // Outgoing to application
-                let (item, addr) = v.ok_or(Error::BcUdpDropReciver)?;
+                let (item, addr) = v.ok_or(Error::BcUdpDropReciver(BcUdpDropReciverKind::NoneRecieved))?;
                 if addr == camera_addr {
                     match item {
                         BcUdp::Discovery(UdpDiscovery{
