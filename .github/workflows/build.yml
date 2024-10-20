@@ -71,11 +71,15 @@ jobs:
             $env:OPENSSL_DIR='D:\\Program Files\OpenSSL\'
           }
 
+          # Set up pkgconfig for gstreamer
+          $env:PKG_CONFIG_PATH += ';' + $env:GSTREAMER_1_0_ROOT_MSVC_X86_64 + '\lib\pkgconfig'
+
           # Set github vars
           Add-Content -Path $env:GITHUB_ENV  -Value "GSTREAMER_1_0_ROOT_MSVC_X86_64=$env:GSTREAMER_1_0_ROOT_MSVC_X86_64"
           Add-Content -Path $env:GITHUB_PATH  -Value "$env:GSTREAMER_1_0_ROOT_MSVC_X86_64\bin"
           Add-Content -Path $env:GITHUB_PATH  -Value "%GSTREAMER_1_0_ROOT_MSVC_X86_64%\bin"
           Add-Content -Path $env:GITHUB_ENV  -Value "OPENSSL_DIR=$env:OPENSSL_DIR"
+          Add-Content -Path $env:GITHUB_ENV  -Value "PKG_CONFIG_PATH=$env:PKG_CONFIG_PATH"
 
           # One last check on directories
           dir "$env:GSTREAMER_1_0_ROOT_MSVC_X86_64"
