@@ -455,6 +455,10 @@ after it stops being used.
 Neolink considers it as being used if there is an active stream running, or
 if there is motion being detected or an mqtt command being run
 
+[Because google remove the api for the push notifications we cannot
+reliably use push notifications to wake up, so motion won't wake
+up neolink anymore]
+
 You can make neolink stop active streams when there are no rtsp clients using
 
 ```toml
@@ -465,9 +469,11 @@ You can make neolink stop active streams when there are no rtsp clients using
 Once in the disconnected state. Neolink will stay disconnected until there is a
 new requested activation such as a client connecting or an mqtt command
 
-Neolink will also wake up on push notifications from the camera. These are usually
+~Neolink will also wake up on push notifications from the camera. These are usually
 sent by the camera on motion or PIR alarms. To disable this you can set
-`push_notifications = false` in the `[[cameras]]` config
+`push_notifications = false` in the `[[cameras]]` config~
+
+[Google removed the apis we were using for push notifications]
 
 ### Docker
 

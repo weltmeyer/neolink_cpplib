@@ -9,7 +9,6 @@ edition = "2021"
 anyhow = "1.0.71"
 clap = { version = "4.2.2", features = ["derive", "cargo"] }
 env_logger = "0.10.0"
-# fcm-push-listener =  { path = "../fcm-push-listener" }
 fcm-push-listener =  { version = "2.0.3" }
 lazy_static = "1.4.0"
 log = { version = "0.4.17", features = [ "release_max_level_debug" ] }
