@@ -76,7 +76,6 @@ jobs:
           Add-Content -Path $env:GITHUB_PATH  -Value "$env:GSTREAMER_1_0_ROOT_MSVC_X86_64\bin"
           Add-Content -Path $env:GITHUB_PATH  -Value "%GSTREAMER_1_0_ROOT_MSVC_X86_64%\bin"
           Add-Content -Path $env:GITHUB_ENV  -Value "OPENSSL_DIR=$env:OPENSSL_DIR"
-          Add-Content -Path $env:GITHUB_ENV  -Value "PKG_CONFIG_PATH=$env:PKG_CONFIG_PATH"
 
           # One last check on directories
           dir "$env:GSTREAMER_1_0_ROOT_MSVC_X86_64"
