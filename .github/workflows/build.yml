@@ -77,7 +77,7 @@ jobs:
           dir "$env:GSTREAMER_1_0_ROOT_MSVC_X86_64"
           echo "$env:GSTREAMER_1_0_ROOT_MSVC_X86_64\\lib"
           dir "$env:GSTREAMER_1_0_ROOT_MSVC_X86_64\\lib"
-          echo $env:GSTREAMER_1_0_ROOT_MSVC_X86_64\\lib\\pkgconfig"
+          echo "$env:GSTREAMER_1_0_ROOT_MSVC_X86_64\\lib\\pkgconfig"
           dir "$env:GSTREAMER_1_0_ROOT_MSVC_X86_64\\lib\\pkgconfig"
 
           # Set github vars
