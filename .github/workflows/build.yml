@@ -33,13 +33,13 @@ jobs:
       - uses: actions/checkout@v4
         name: Checkout onto ${{ runner.os }}
       - if: runner.os == 'Linux'
-        name: apt install gstreamer
+        name: apt install linux deps
         run: |
           sudo apt update
           sudo apt install -y aptitude
           sudo aptitude install -y libgstrtspserver-1.0-dev libgstreamer1.0-dev libgtk2.0-dev protobuf-compiler libssl-dev
       - if: runner.os == 'Windows'
-        name: Install Gstreamer
+        name: Install Windows deps
         run: |
           # Gstreamer
           choco install -y --no-progress gstreamer --version=1.20.0
@@ -73,7 +73,12 @@ jobs:
 
           # Set up pkgconfig for gstreamer
           $env:PKG_CONFIG_PATH += ';' + $env:GSTREAMER_1_0_ROOT_MSVC_X86_64 + '\lib\pkgconfig'
-          dir "$env:GSTREAMER_1_0_ROOT_MSVC_X86_64\lib\pkgconfig"
+          echo "$env:GSTREAMER_1_0_ROOT_MSVC_X86_64"
+          dir "$env:GSTREAMER_1_0_ROOT_MSVC_X86_64"
+          echo "$env:GSTREAMER_1_0_ROOT_MSVC_X86_64\\lib"
+          dir "$env:GSTREAMER_1_0_ROOT_MSVC_X86_64\\lib"
+          echo $env:GSTREAMER_1_0_ROOT_MSVC_X86_64\\lib\\pkgconfig"
+          dir "$env:GSTREAMER_1_0_ROOT_MSVC_X86_64\\lib\\pkgconfig"
 
           # Set github vars
           Add-Content -Path $env:GITHUB_ENV  -Value "GSTREAMER_1_0_ROOT_MSVC_X86_64=$env:GSTREAMER_1_0_ROOT_MSVC_X86_64"
@@ -86,7 +91,7 @@ jobs:
           dir "$env:GSTREAMER_1_0_ROOT_MSVC_X86_64"
           dir "$env:OPENSSL_DIR"
       - if: runner.os == 'macOS'
-        name: Install Gstreamer on macOS
+        name: Install macOS deps
         run: |
           curl -L 'https://gstreamer.freedesktop.org/data/pkg/osx/1.20.4/gstreamer-1.0-devel-1.20.4-universal.pkg' -o "$(pwd)/gstreamer-devel.pkg"
           sudo installer -verbose -pkg "$(pwd)/gstreamer-devel.pkg" -target /
