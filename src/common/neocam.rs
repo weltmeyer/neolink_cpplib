@@ -27,7 +27,7 @@ use super::{
 use super::{PnRequest, PushNoti};
 use crate::{config::CameraConfig, AnyResult, Result};
 use neolink_core::bc_protocol::BcCamera;
-#[cfg(feature = "gstreamer")]
+
 #[allow(dead_code)]
 pub(crate) enum NeoCamCommand {
     HangUp,
