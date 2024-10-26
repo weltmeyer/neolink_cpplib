@@ -178,6 +178,7 @@ jobs:
           echo "${HOME}/.cargo/bin" >> "${GITHUB_PATH}"
       - name: Install ${{ matrix.arch }} Rust toolchain
         run: |
+          rustup default 1.84.0
           rustup target add ${TARGET}
         env:
           TARGET: ${{ matrix.target }}
@@ -282,8 +283,9 @@ jobs:
           echo "TAGS=${tagstr}"  >> "${GITHUB_OUTPUT}"
         env:
           REPO_NAME: ${{ steps.docker_repo.outputs.DOCKER_NWO }}
-      - name: Install latest rust
+      - name: Install rust
         run: |
+          rustup default 1.84.0
           rustup toolchain install stable
       - name: Install toml-cli
         run: |
@@ -341,8 +343,9 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-      - name: Install latest rust
+      - name: Install rust
         run: |
+          rustup default 1.84.0
           rustup toolchain install stable
       - name: Install toml-cli
         run: |
