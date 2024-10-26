@@ -192,8 +192,11 @@ pub struct BcMeta {
     pub stream_type: u8,
     /// On modern messages this is the response code
     /// When sending a command it is set to `0`. The reply from the camera can be
+    ///
     /// - `200` for OK
+    ///
     /// - `400` for bad request
+    ///
     /// A malformed packet will return a `400` code
     pub response_code: u16,
     /// A message ID is used to match replies with requests. The camera will parrot back
@@ -211,14 +214,6 @@ pub struct BcMeta {
     /// - 0x6414: "modern" 24 bytes
     /// - 0x0000: "modern" 24 bytes
     pub class: u16,
-}
-
-/// The components of the Baichuan header that must be filled out after the body is serialized, or
-/// is needed for the deserialization of the body (strictly part of the wire format of the message)
-#[derive(Debug, PartialEq, Eq)]
-pub(super) struct BcSendInfo {
-    pub body_len: u32,
-    pub payload_offset: Option<u32>,
 }
 
 #[derive(Debug)]

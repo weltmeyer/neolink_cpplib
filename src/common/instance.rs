@@ -26,7 +26,6 @@ use neolink_core::{
     bc_protocol::{BcCamera, StreamKind},
     bcmedia::model::BcMedia,
 };
-#[cfg(feature = "gstreamer")]
 
 /// This instance is the primary interface used throughout the app
 ///
@@ -423,7 +422,7 @@ impl NeoInstance {
                 }),
             ));
 
-            #[cfg(pushnoti)]
+            #[cfg(feature = "pushnoti")]
             {
                 // Creates a permit for controlling based on the PN
                 let pn_permit = counter.create_deactivated().await?;

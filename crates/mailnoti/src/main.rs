@@ -53,14 +53,6 @@ async fn main() -> Result<()> {
     Ok(())
 }
 
-fn get_local_ip() -> Result<std::net::IpAddr> {
-    get_if_addrs::get_if_addrs()?
-        .iter()
-        .find(|i| !i.is_loopback() && matches!(i.addr, get_if_addrs::IfAddr::V4(_)))
-        .map(|iface| Ok(iface.ip()))
-        .unwrap_or_else(|| Err(anyhow!("No Local Ip Address Found")))
-}
-
 async fn cam_tasks(name: &str, camera: BcCamera, addr: SocketAddr) -> Result<()> {
     let support = camera.get_support().await?;
     if support.email.is_some_and(|v| v > 0) {
