@@ -35,9 +35,13 @@ jobs:
           rustup override set nightly
       - name: Run clippy manually
         run: |
+          echo "All Features"
           cargo +nightly clippy --workspace --all-targets --all-features || exit 1
+          echo "No Features"
           cargo +nightly clippy --workspace --all-targets --no-default-features || exit 1
+          echo "Gstreamer Only"
           cargo +nightly clippy --workspace --all-targets --no-default-features --features=gstreamer || exit 1
+          echo "Pushnoti Only"
           cargo +nightly clippy --workspace --all-targets --no-default-features --features=pushnoti || exit 1
 
   check_fmt:
