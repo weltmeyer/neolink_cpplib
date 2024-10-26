@@ -81,7 +81,6 @@ impl NeoCam {
         // other threads
         let sender_cancel = me.cancel.clone();
         let mut commander_rx = ReceiverStream::new(commander_rx);
-        #[cfg(feature = "gstreamer")]
         let thread_commander_tx = commander_tx.clone();
         let thread_watch_config_rx = watch_config_rx.clone();
         #[cfg(feature = "pushnoti")]
