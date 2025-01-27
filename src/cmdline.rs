@@ -32,4 +32,5 @@ pub enum Command {
     Image(super::image::Opt),
     Battery(super::battery::Opt),
     Services(super::services::Opt),
+    Users(super::users::Opt),
 }

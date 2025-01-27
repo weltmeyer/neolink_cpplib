@@ -52,6 +52,7 @@ mod services;
 mod statusled;
 #[cfg(feature = "gstreamer")]
 mod talk;
+mod users;
 mod utils;
 
 use cmdline::{Command, Opt};
@@ -142,6 +143,9 @@ async fn main() -> Result<()> {
         }
         Some(Command::Services(opts)) => {
             services::main(opts, neo_reactor.clone()).await?;
+        }
+        Some(Command::Users(opts)) => {
+            users::main(opts, neo_reactor.clone()).await?;
         }
     }
 
