@@ -1267,11 +1267,107 @@ Message have zero to two payloads.
     ```
 
   - **Notes:** The passwords are not sent in some models of cameras namely
-    RLC-410 4mp, RLC-410 5mp, RLC-520 (fw 200710) in these cases the passwords
-    are blank. In some older cameras that do not use encryption at all these
-    passwords are completely visible to any network sniffers. Even the "encrypted"
-    cameras only have weak encryption that is easily broken since the
-    decryption key is fixed and well-known.
+    RLC-410 4mp, RLC-410 5mp, RLC-520 (fw 200710), RLC-811A in these cases the
+    passwords are blank. In some older cameras that do not use encryption at
+    all these passwords are completely visible to any network sniffers. Even
+    the "encrypted" cameras only have weak encryption that is easily broken
+    since the decryption key is fixed and well-known.
+
+- 59: `<UserList>`
+
+  - Client
+
+    - Header: Standard header
+
+    - Extension
+
+    ```xml
+    <?xml version="1.0" encoding="UTF-8" ?>
+    <Extension version="1.1">
+    <userName>admin</userName>
+    </Extension>
+    ```
+
+  - Camera
+
+    - Header: Standard header
+
+    - Payload — Changing the password of testUser
+
+    ```xml
+    <?xml version="1.0" encoding="UTF-8" ?>
+    <body>
+    <UserList version="1.1">
+    <User>
+    <userName>admin</userName>
+    <password>password12</password>
+    <userLevel>1</userLevel>
+    <userSetState>none</userSetState>
+    </User>
+    <User>
+    <userName>testUser</userName>
+    <password>newPass</password>
+    <userLevel>0</userLevel>
+    <userSetState>modify</userSetState>
+    </User>
+    </UserList>
+    </body>
+    ```
+
+    - Payload — creating a user
+
+    ```xml
+    <?xml version="1.0" encoding="UTF-8" ?>
+    <body>
+    <UserList version="1.1">
+    <User>
+    <userName>admin</userName>
+    <password>password12</password>
+    <userLevel>1</userLevel>
+    <userSetState>none</userSetState>
+    </User>
+    <User>
+    <userName>testUser</userName>
+    <password>testPass</password>
+    <userLevel>0</userLevel>
+    <userSetState>add</userSetState>
+    </User>
+    </UserList>
+    </body>
+    ```
+
+    - Payload — deleting a user
+
+    ```xml
+    <?xml version="1.0" encoding="UTF-8" ?>
+    <body>
+    <UserList version="1.1">
+    <User>
+    <userName>admin</userName>
+    <password>password12</password>
+    <userLevel>1</userLevel>
+    <userSetState>none</userSetState>
+    </User>
+    <User>
+    <userName>testUser</userName>
+    <password>newPass</password>
+    <userLevel>0</userLevel>
+    <userSetState>delete</userSetState>
+    </User>
+    </UserList>
+    </body>
+    ```
+
+  - **Notes:** The passwords are not sent in some models of cameras namely
+    RLC-410 4mp, RLC-410 5mp, RLC-520 (fw 200710), RLC-811A in these cases the
+    passwords are blank. In some older cameras that do not use encryption at
+    all these passwords are completely visible to any network sniffers. Even
+    the "encrypted" cameras only have weak encryption that is easily broken
+    since the decryption key is fixed and well-known.
+  - **Notes:** The password field seems to only be needed when creating a user
+    or changing a users password.
+  - **Notes:** It does not appear like userLevel is modifiable (at least on
+    RLC-811A)
 
 - 67: `<ConfigFileInfo> (FW Upgrade)`
 
