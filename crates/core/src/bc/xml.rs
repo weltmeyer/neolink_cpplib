@@ -1587,7 +1587,11 @@ pub struct User {
     #[serde(rename = "userName")]
     pub user_name: String,
     /// The password seems to only be included when creating or modifying a user
-    #[serde(rename = "password", skip_serializing_if = "Option::is_none", skip_deserializing)]
+    #[serde(
+        rename = "password",
+        skip_serializing_if = "Option::is_none",
+        skip_deserializing
+    )]
     pub password: Option<String>,
     /// The user_id does not seem to have a purpose. It is not included when creating a user.
     #[serde(rename = "userId", skip_serializing_if = "Option::is_none")]
