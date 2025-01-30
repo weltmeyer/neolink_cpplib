@@ -138,6 +138,9 @@ pub struct BcXml {
     /// EmailTask for turning the email notifications on/off
     #[serde(rename = "EmailTask", skip_serializing_if = "Option::is_none")]
     pub email_task: Option<EmailTask>,
+    /// Read and write users
+    #[serde(rename = "UserList", skip_serializing_if = "Option::is_none")]
+    pub user_list: Option<UserList>,
 }
 
 impl BcXml {
@@ -1564,6 +1567,52 @@ pub struct Schedule {
     /// The list of time blocks
     #[serde(rename = "timeBlockList")]
     pub time_block_list: TimeBlockList,
+}
+
+/// List of users
+#[derive(PartialEq, Eq, Default, Debug, Deserialize, Serialize)]
+pub struct UserList {
+    /// XML Version
+    #[serde(rename = "@version")]
+    pub version: String,
+    /// The actual user-list
+    #[serde(rename = "User", skip_serializing_if = "Option::is_none")]
+    pub user_list: Option<Vec<User>>,
+}
+
+/// A struct for reading and writing camera user records
+#[derive(PartialEq, Eq, Default, Debug, Deserialize, Serialize)]
+pub struct User {
+    /// The user_name is used to identify the user in the API
+    #[serde(rename = "userName")]
+    pub user_name: String,
+    /// The password seems to only be included when creating or modifying a user
+    #[serde(
+        rename = "password",
+        skip_serializing_if = "Option::is_none",
+        skip_deserializing
+    )]
+    pub password: Option<String>,
+    /// The user_id does not seem to have a purpose. It is not included when creating a user.
+    #[serde(rename = "userId", skip_serializing_if = "Option::is_none")]
+    pub user_id: Option<u32>,
+    /// User type, 0 is User and 1 is Administrator
+    #[serde(rename = "userLevel")]
+    pub user_level: u8,
+    /// Unknown, seems to be 1 for the current API user
+    #[serde(rename = "loginState", skip_serializing_if = "Option::is_none")]
+    pub login_state: Option<u8>,
+    /// The user_set_state states what will happen with a user-record. 4 different values have been
+    /// observed: none | add | delete | modify
+    ///
+    /// | Value  | Description                                                                                                        |
+    /// | ---    | ---                                                                                                                |
+    /// | none   | This is the state set when reading Users. When writing this seems to indicate that the user should not be modified |
+    /// | add    | Indicates that a new User should be created                                                                        |
+    /// | delete | Indicates that the user should be removed                                                                          |
+    /// | modify | Indicates that the user should be modified. It seems like only the password can be changed.                        |
+    #[serde(rename = "userSetState")]
+    pub user_set_state: String,
 }
 
 /// Convience function to return the xml version used throughout the library

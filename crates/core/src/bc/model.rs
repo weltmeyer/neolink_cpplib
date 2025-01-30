@@ -40,6 +40,10 @@ pub const MSG_ID_GET_SERVICE_PORTS: u32 = 37;
 pub const MSG_ID_GET_EMAIL: u32 = 42;
 /// Set email settings
 pub const MSG_ID_SET_EMAIL: u32 = 43;
+/// Get users and general system info
+pub const MSG_ID_GET_ABILITY_SUPPORT: u32 = 58;
+/// Update, create and remove users
+pub const MSG_ID_UPDATE_USER_LIST: u32 = 59;
 /// Version messages have this ID
 pub const MSG_ID_VERSION: u32 = 80;
 /// Ping messages have this ID
