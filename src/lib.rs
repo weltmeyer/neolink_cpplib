@@ -1,4 +1,4 @@
-use neolink_core::bc_protocol;
+//use neolink_core::bc_protocol;
 pub use neolink_core::{
     //bc_protocol::{StreamOutput, StreamOutputError},
     bcmedia::model::*,
@@ -10,22 +10,24 @@ use neolink_core::bc_protocol::BcCameraOpt;
 use neolink_core::bc_protocol::ConnectionProtocol;
 use neolink_core::bc_protocol::Credentials;
 use neolink_core::bc_protocol::DiscoveryMethods;
-use std::collections::HashMap;
-use std::fmt::Debug;
-use std::ptr::null;
+//use std::collections::HashMap;
+//use std::fmt::Debug;
+//use std::ptr::null;
 //use neolink_core::bc_protocol::{self, Stream};
 use lazy_static::lazy_static;
 use std::convert::TryInto;
 use std::ffi::CStr;
 use std::os::raw::c_char;
-use std::thread;
-use std::{
+//use std::thread;
+/*use std::{
    // fmt::{Display, Error as FmtError, Formatter},
     net::{IpAddr/*, ToSocketAddrs*/},
     str::FromStr,
-};
+};*/
 use std::net::SocketAddr;
 use tokio::runtime::Runtime;
+use ctor::ctor;
+
 //pub use neolink_core::bc_protocol::Error;
 
 #[repr(C)]
@@ -60,10 +62,22 @@ lazy_static! {
    
 }*/
 
-//
+
+
+#[ctor]
+#[allow(unsafe_code)]
+unsafe fn foo() {
+    println!("foo");
+    let _ = env_logger::init();
+    println!("foo2");
+}
+
+
+
+/*
 fn print_type_of<T>(_: &T) {
     println!("{}", std::any::type_name::<T>())
-}
+}*/
 
 #[no_mangle]
 pub extern "C" fn lib_test() {
@@ -78,8 +92,6 @@ pub extern "C" fn lib_cam_open(
     c_password: *const c_char,
 ) -> *mut BcCamera {
 
-        env_logger::try_init();
-    
     let ipaddress = string_from_c(c_ipaddress);
     let password = string_from_c(c_password);
     let username = string_from_c(c_username);
@@ -88,12 +100,12 @@ pub extern "C" fn lib_cam_open(
     let socketaddr: SocketAddr = ipaddress.parse().unwrap();
     //let ipadr=IpAddr::from_str(&ipaddress).unwrap();
     let ipadr=socketaddr.ip();
-    let finalAddr=vec![ipadr];
+    let final_addr=vec![ipadr];
     let name="Extern";
     let options = BcCameraOpt {
         name: name.to_string(),
         channel_id: 0,
-        addrs: finalAddr,
+        addrs: final_addr,
         port: Some(socketaddr.port()),
         uid: None,
         protocol: ConnectionProtocol::Tcp,
@@ -108,13 +120,13 @@ pub extern "C" fn lib_cam_open(
 
     //neolink_core::bc_protocol::Error::AuthFailed
     //let mut rt = Runtime::new().unwrap();
-    let cameraResult: std::result::Result<BcCamera,neolink_core::bc_protocol::Error> = RT.block_on(async { BcCamera::new(&options).await});
+    let camera_result: std::result::Result<BcCamera,neolink_core::bc_protocol::Error> = RT.block_on(async { BcCamera::new(&options).await});
 
-    match cameraResult{
+    match camera_result{
         Ok(camera)=>{
             return Box::into_raw(Box::new(camera));
         },
-        Err(error)=>{
+        Err(_error)=>{
             //if(error==neolink_core::bc_protocol::Error.Io
             //error.fmt(std::fmt::Display)
             //error.
@@ -137,7 +149,7 @@ pub extern "C" fn lib_cam_start_stream(
     newdata: unsafe extern "C" fn(FrameType, u32, *mut u8, i32, u32),
     info: unsafe extern "C" fn(u32, u32, u8), //width,height,fps
 ) {
-    let mut ext_output: ExtOutputs = ExtOutputs {
+    let  ext_output: ExtOutputs = ExtOutputs {
         frame_func: newdata,
         info_func: info,
     };
@@ -154,11 +166,11 @@ pub extern "C" fn lib_cam_start_stream(
             RT.spawn(
             async move{
                 println!("hello from the async block");
-                let loginResult=cam.login().await.expect("Bad Login data");
+                let login_result=cam.login().await.expect("Bad Login data");
 
 
 
-                let resolution=loginResult.resolution.expect("No resolution?");
+                let resolution=login_result.resolution.expect("No resolution?");
                 
                 println!("IAMLOGGEDIN");
                 
@@ -173,7 +185,7 @@ pub extern "C" fn lib_cam_start_stream(
                     
                     let data = match stream_data.get_data().await{
                         Ok(x)=>x.expect("JW:error2"),
-                        Err(e)=>break
+                        Err(_e)=>break
                     };
                     
 
@@ -275,12 +287,16 @@ pub extern "C" fn lib_cam_stop(ptr: *mut BcCamera) {
         assert!(!ptr.is_null());
         &mut *ptr
     };
+
+    
+    
     log::debug!("Shutdown...");
 
     //let mut rt = Runtime::new().unwrap();
     RT.block_on(
         async {
             let _ = cam.stop_video(StreamKind::Main).await;
+            let _ = cam.logout().await;
             let _ = cam.shutdown().await;
         }
     );
@@ -296,10 +312,14 @@ pub extern "C" fn lib_cam_stop(ptr: *mut BcCamera) {
     RT.block_on(
         async {
             let _ = cam.join().await;
-            
         }
     );
     log::debug!("Join!");
+    RT.block_on(
+        async {
+            unsafe{drop(Box::from_raw(ptr)); }
+        }
+    );
 }
 
 pub fn string_from_c(s: *const c_char) -> String {
