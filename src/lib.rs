@@ -155,8 +155,14 @@ pub extern "C" fn lib_cam_start_stream(
             async move{
                 println!("hello from the async block");
                 let loginResult=cam.login().await.expect("Bad Login data");
+
+
+
+                let resolution=loginResult.resolution.expect("No resolution?");
+                
                 println!("IAMLOGGEDIN");
-                unsafe { (ext_output.info_func)(loginResult.resolution.width, loginResult.resolution.height, 0) };
+                
+                unsafe { (ext_output.info_func)(resolution.width, resolution.height, 0) };
                 let mut stream_data=cam.start_video(StreamKind::Main,09999,true).await.expect("JW:error1");
                 //let mut stream_data = camera.start_video(name, 0, strict).await?;
 
