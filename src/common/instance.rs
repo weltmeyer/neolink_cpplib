@@ -9,16 +9,21 @@ use futures::TryFutureExt;
 use std::sync::{Arc, Weak};
 use tokio::{
     sync::{
-        mpsc::Sender as MpscSender, oneshot::channel as oneshot, watch::channel as watch,
-        watch::Receiver as WatchReceiver,
+        mpsc::Sender as MpscSender, oneshot::channel as oneshot, watch::Receiver as WatchReceiver,
     },
     time::{sleep, Duration},
 };
 use tokio_util::sync::CancellationToken;
 
-use super::{MdState, NeoCamCommand, NeoCamThreadState, Permit, PushNoti, StreamInstance};
+use super::{MdState, NeoCamCommand, NeoCamThreadState, Permit};
 use crate::{config::CameraConfig, AnyResult, Result};
-use neolink_core::bc_protocol::{BcCamera, StreamKind};
+use neolink_core::bc_protocol::BcCamera;
+
+#[cfg(feature = "gstreamer")]
+mod gst;
+
+#[cfg(feature = "pushnoti")]
+mod pushnoti;
 
 /// This instance is the primary interface used throughout the app
 ///
@@ -120,15 +125,17 @@ impl NeoInstance {
                     if let Some(cam) = camera.clone() {
                         let cam_ref = cam.as_ref();
                         let mut r = Err(anyhow!("No run"));
-                        for _ in 0..5 {
+                        for i in 0..5 {
                             r = task(cam_ref).await;
                             if let Err(e) = &r {
-                                log::debug!("- Task Result: {e:?}");
+                                log::debug!("- Task Error: {e:?}");
                             }
-                            if let Err(Some(neolink_core::Error::CameraServiceUnavaliable(400))) = r.as_ref().map_err(|e| e.downcast_ref::<neolink_core::Error>()) {
+                            if let Err(Some(e @ neolink_core::Error::CameraServiceUnavailable{code: 400, ..})) = r.as_ref().map_err(|e| e.downcast_ref::<neolink_core::Error>()) {
                                 // Retryable without a reconnect
                                 // Usually occurs when camera is starting up
                                 // or the connection is initialising
+                                log::debug!("Got a 400 code for {e:?} retry {i}/5, ");
+
                                 sleep(Duration::from_secs(1)).await;
                                 continue;
                             } else {
@@ -147,73 +154,70 @@ impl NeoInstance {
                         Err(e) => {
                             match e.downcast::<neolink_core::Error>() {
                                 Ok(neolink_core::Error::DroppedConnection) | Ok(neolink_core::Error::TimeoutDisconnected) => {
-                                    log::debug!("  - Neolink error continue");
                                     continue;
                                 },
                                 Ok(neolink_core::Error::TokioBcSendError) => {
-                                    log::debug!("  - Neolink Send Error continue");
                                     continue;
                                 },
                                 Ok(neolink_core::Error::Io(e)) => {
-                                    log::debug!("  - Neolink Std IO Error");
                                     use std::io::ErrorKind::*;
                                     if let ConnectionReset | ConnectionAborted | BrokenPipe | TimedOut =  e.kind() {
                                         // Resetable IO
-                                        log::debug!("    - Neolink Std IO Error: Continue");
+                                        log::trace!("    - Neolink Std IO Error: Continue");
                                         continue;
                                     } else {
                                         // Check if  the inner error is the Other type and then the discomnect
                                         let is_dropped = e.get_ref().is_some_and(|e| {
-                                            log::debug!("Std IO Error: Inner: {:?}", e);
+                                            log::trace!("Std IO Error: Inner: {:?}", e);
                                             matches!(e.downcast_ref::<neolink_core::Error>(),
                                                     Some(neolink_core::Error::DroppedConnection) | Some(neolink_core::Error::TimeoutDisconnected)
                                             )
                                         });
                                         if is_dropped {
                                             // Retry is a None
-                                            log::debug!("    - Neolink Std IO Error => Neolink: Continue");
+                                            log::trace!("    - Neolink Std IO Error => Neolink: Continue");
                                             continue;
                                         } else {
-                                            log::debug!("    - Neolink Std IO Error: Other");
+                                            log::trace!("    - Neolink Std IO Error: Other");
                                             Err(e.into())
                                         }
                                     }
                                 }
                                 Ok(e) => {
-                                    log::debug!("  - Neolink Error: Other");
+                                    log::trace!("  - Neolink Error: Other");
                                     Err(e.into())
                                 },
                                 Err(e) => {
                                     // Check if it is an io error
-                                    log::debug!("  - Other Error: {:?}", e);
+                                    log::trace!("  - Other Error: {:?}", e);
                                     match e.downcast::<std::io::Error>() {
                                         Ok(e) => {
-                                            log::debug!("    - Std IO Error");
+                                            log::trace!("    - Std IO Error");
                                             // Check if  the inner error is the Other type and then the discomnect
                                             use std::io::ErrorKind::*;
                                             if let ConnectionReset | ConnectionAborted | BrokenPipe | TimedOut =  e.kind() {
                                                 // Resetable IO
-                                                log::debug!("      - Std IO Error: Continue");
+                                                log::trace!("      - Std IO Error: Continue");
                                                 continue;
                                             } else {
                                                 let is_dropped = e.get_ref().is_some_and(|e| {
-                                                    log::debug!("Std IO Error: Inner: {:?}", e);
+                                                    log::trace!("Std IO Error: Inner: {:?}", e);
                                                     matches!(e.downcast_ref::<neolink_core::Error>(),
                                                             Some(neolink_core::Error::DroppedConnection) | Some(neolink_core::Error::TimeoutDisconnected) | Some(neolink_core::Error::TokioBcSendError)
                                                     )
                                                 });
                                                 if is_dropped {
                                                     // Retry is a None
-                                                    log::debug!("      - Std IO Error => Neolink Error: Continue");
+                                                    log::trace!("      - Std IO Error => Neolink Error: Continue");
                                                     continue;
                                                 } else {
-                                                    log::debug!("      - Std IO Error: Other");
+                                                    log::trace!("      - Std IO Error: Other");
                                                     Err(e.into())
                                                 }
                                             }
                                         },
                                         Err(e) => {
-                                            log::debug!("  - Other Error: {:?}", e);
+                                            log::trace!("  - Other Error: {:?}", e);
                                             Err(e)
                                         }
                                     }
@@ -224,77 +228,6 @@ impl NeoInstance {
                 },
             };
         }
-    }
-
-    pub(crate) async fn stream(&self, name: StreamKind) -> Result<StreamInstance> {
-        let (instance_tx, instance_rx) = oneshot();
-        self.camera_control
-            .send(NeoCamCommand::Stream(name, instance_tx))
-            .await?;
-        Ok(instance_rx.await?)
-    }
-
-    #[allow(dead_code)]
-    pub(crate) async fn low_stream(&self) -> Result<Option<StreamInstance>> {
-        let (instance_tx, instance_rx) = oneshot();
-        self.camera_control
-            .send(NeoCamCommand::LowStream(instance_tx))
-            .await?;
-        Ok(instance_rx.await?)
-    }
-
-    #[allow(dead_code)]
-    pub(crate) async fn high_stream(&self) -> Result<Option<StreamInstance>> {
-        let (instance_tx, instance_rx) = oneshot();
-        self.camera_control
-            .send(NeoCamCommand::HighStream(instance_tx))
-            .await?;
-        Ok(instance_rx.await?)
-    }
-
-    #[allow(dead_code)]
-    pub(crate) async fn streams(&self) -> Result<Vec<StreamInstance>> {
-        let (instance_tx, instance_rx) = oneshot();
-        self.camera_control
-            .send(NeoCamCommand::Streams(instance_tx))
-            .await?;
-        Ok(instance_rx.await?)
-    }
-
-    pub(crate) async fn push_notifications(&self) -> Result<WatchReceiver<Option<PushNoti>>> {
-        let uid = self
-            .run_task(|cam| Box::pin(async move { Ok(cam.uid().await?) }))
-            .await?;
-        let (instance_tx, instance_rx) = oneshot();
-        self.camera_control
-            .send(NeoCamCommand::PushNoti(instance_tx))
-            .await?;
-        let mut source_watch = instance_rx.await?;
-
-        let (fwatch_tx, fwatch_rx) = watch(None);
-        tokio::task::spawn(async move {
-            loop {
-                match source_watch
-                    .wait_for(|i| {
-                        fwatch_tx.borrow().as_ref() != i.as_ref()
-                            && i.as_ref()
-                                .is_some_and(|i| i.message.contains(&format!("\"{uid}\"")))
-                    })
-                    .await
-                {
-                    Ok(pn) => {
-                        log::debug!("Forwarding push notification about {}", uid);
-                        let _ = fwatch_tx.send_replace(pn.clone());
-                    }
-                    Err(e) => {
-                        break Err(e);
-                    }
-                }
-            }?;
-            AnyResult::Ok(())
-        });
-
-        Ok(fwatch_rx)
     }
 
     pub(crate) async fn motion(&self) -> Result<WatchReceiver<MdState>> {

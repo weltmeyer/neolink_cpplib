@@ -20,7 +20,7 @@
 //! You should have received a copy of the GNU General Public License along with this program. If
 //! not, see <https://www.gnu.org/licenses/>.
 //!
-//! Neolink source code is available online at <https://github.com/thirtythreeforty/neolink>
+//! Neolink source code is available online at <https://github.com/QuantumEntangledAndy/neolink>
 //!
 #[cfg(not(target_env = "msvc"))]
 use tikv_jemallocator::Jemalloc;
@@ -40,33 +40,26 @@ mod battery;
 mod cmdline;
 mod common;
 mod config;
+#[cfg(feature = "gstreamer")]
 mod image;
 mod mqtt;
 mod pir;
 mod ptz;
 mod reboot;
+#[cfg(feature = "gstreamer")]
 mod rtsp;
+mod services;
 mod statusled;
+#[cfg(feature = "gstreamer")]
 mod talk;
+mod users;
 mod utils;
 
 use cmdline::{Command, Opt};
 use common::NeoReactor;
 use config::Config;
-use console_subscriber as _;
 
 pub(crate) type AnyResult<T> = Result<T, anyhow::Error>;
-
-#[cfg(tokio_unstable)]
-fn tokio_console_enable() {
-    info!("Tokio Console Enabled");
-    console_subscriber::init();
-}
-
-#[cfg(not(tokio_unstable))]
-fn tokio_console_enable() {
-    debug!("Tokio Console Disabled");
-}
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -91,20 +84,27 @@ async fn main() -> Result<()> {
         .validate()
         .with_context(|| format!("Failed to validate the {:?} config file", conf_path))?;
 
-    if config.tokio_console {
-        tokio_console_enable();
-    }
-
     let neo_reactor = NeoReactor::new(config.clone()).await;
 
     match opt.cmd {
+        #[cfg(feature = "gstreamer")]
         None => {
             warn!(
                 "Deprecated command line option. Please use: `neolink rtsp --config={:?}`",
-                config
+                conf_path
             );
             rtsp::main(rtsp::Opt {}, neo_reactor.clone()).await?;
         }
+        #[cfg(not(feature = "gstreamer"))]
+        None => {
+            // When gstreamer is disabled the default command is MQTT
+            warn!(
+                "Deprecated command line option. Please use: `neolink mqtt --config={:?}`",
+                conf_path
+            );
+            mqtt::main(mqtt::Opt {}, neo_reactor.clone()).await?;
+        }
+        #[cfg(feature = "gstreamer")]
         Some(Command::Rtsp(opts)) => {
             rtsp::main(opts, neo_reactor.clone()).await?;
         }
@@ -120,23 +120,32 @@ async fn main() -> Result<()> {
         Some(Command::Ptz(opts)) => {
             ptz::main(opts, neo_reactor.clone()).await?;
         }
+        #[cfg(feature = "gstreamer")]
         Some(Command::Talk(opts)) => {
             talk::main(opts, neo_reactor.clone()).await?;
         }
         Some(Command::Mqtt(opts)) => {
             mqtt::main(opts, neo_reactor.clone()).await?;
         }
+        #[cfg(feature = "gstreamer")]
         Some(Command::MqttRtsp(opts)) => {
             tokio::select! {
                 v = mqtt::main(opts, neo_reactor.clone()) => v,
                 v = rtsp::main(rtsp::Opt {}, neo_reactor.clone()) => v,
             }?;
         }
+        #[cfg(feature = "gstreamer")]
         Some(Command::Image(opts)) => {
             image::main(opts, neo_reactor.clone()).await?;
         }
         Some(Command::Battery(opts)) => {
             battery::main(opts, neo_reactor.clone()).await?;
+        }
+        Some(Command::Services(opts)) => {
+            services::main(opts, neo_reactor.clone()).await?;
+        }
+        Some(Command::Users(opts)) => {
+            users::main(opts, neo_reactor.clone()).await?;
         }
     }
 

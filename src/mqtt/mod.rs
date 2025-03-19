@@ -123,7 +123,7 @@ pub(crate) async fn main(_: Opt, reactor: NeoReactor) -> Result<()> {
                     config_names = thread_config.borrow().clone().cameras.iter().filter(|a| a.enabled).map(|cam_config| cam_config.name.clone()).collect::<HashSet<_>>();
 
                     for name in config_names.iter() {
-                        log::info!("{name}: MQTT Staring");
+                        log::info!("{name}: MQTT Starting");
                         if ! cameras.contains_key(name) {
                             let local_cancel = CancellationToken::new();
                             cameras.insert(name.clone(),local_cancel.clone());
@@ -150,7 +150,6 @@ pub(crate) async fn main(_: Opt, reactor: NeoReactor) -> Result<()> {
                                     if let Ok(()) = &r {
                                         break r
                                     } else {
-                                        log::debug!("listen_on_camera stopped: {:?}", r);
                                         continue;
                                     }
                                 }
@@ -160,7 +159,6 @@ pub(crate) async fn main(_: Opt, reactor: NeoReactor) -> Result<()> {
 
                     for (running_name, token) in cameras.iter() {
                         if ! config_names.contains(running_name) {
-                            log::debug!("Mqtt::main Cancel");
                             token.cancel();
                         }
                     }
@@ -213,7 +211,40 @@ pub(crate) async fn main(_: Opt, reactor: NeoReactor) -> Result<()> {
                                 .await?;
                             continue;
                         }
-                        let config = config?;
+                        let curr_config = thread_config.borrow().clone();
+                        let mut config = config?;
+
+                        // Fill in skipped passwords
+                        if let (Some(mqtt), Some(curr_mqtt)) = (config.mqtt.as_mut(), curr_config.mqtt.as_ref()) {
+                            if mqtt.credentials.is_none() {
+                                mqtt.credentials = curr_mqtt.credentials.clone();
+                            }
+                            if mqtt.ca.is_none() {
+                                mqtt.ca = curr_mqtt.ca.clone();
+                            }
+                            if mqtt.client_auth.is_none() {
+                                mqtt.client_auth = curr_mqtt.client_auth.clone();
+                            }
+                        }
+                        for cam in config.cameras.iter_mut() {
+                            let name = cam.name.clone();
+                            let cur_cam = curr_config.cameras.iter().find(|c| c.name == name);
+                            if let Some(cur_cam) = cur_cam.as_ref() {
+                                if cam.password.is_none() {
+                                    cam.password = cur_cam.password.clone();
+                                }
+                            }
+                        }
+                        for user in config.users.iter_mut() {
+                            let name = user.name.clone();
+                            let cur_user = curr_config.users.iter().find(|c| c.name == name);
+                            if let Some(cur_user) = cur_user.as_ref() {
+                                if user.pass.is_none() {
+                                    user.pass = cur_user.pass.clone();
+                                }
+                            }
+                        }
+                        // Passwords should now be restored if they were not set
 
                         let validate = config.validate().with_context(|| {
                             format!("Failed to validate the MQTT {:?} config file", msg.topic)
@@ -300,7 +331,9 @@ async fn listen_on_camera(camera: NeoInstance, mqtt_instance: MqttInstance) -> R
                 let camera_motion = camera.clone();
                 let mqtt_motion = mqtt_instance.resubscribe().await?;
 
+                #[cfg(feature = "pushnoti")]
                 let camera_pn = camera.clone();
+                #[cfg(feature = "pushnoti")]
                 let mqtt_pn = mqtt_instance.resubscribe().await?;
 
                 let camera_snap = camera.clone();
@@ -329,7 +362,6 @@ async fn listen_on_camera(camera: NeoInstance, mqtt_instance: MqttInstance) -> R
                                         tokio::select!{
                                             _ = cancel_msg.cancelled() => AnyResult::Ok(()),
                                             v = async {
-                                                // log::debug!("Got message: {msg:?}");
                                                 let res = handle_mqtt_message(msg, &mqtt_msg, &camera_msg).await;
                                                 if res.is_err() {
                                                     tx.send(res).await?;
@@ -339,14 +371,11 @@ async fn listen_on_camera(camera: NeoInstance, mqtt_instance: MqttInstance) -> R
                                         }
                                     });
                                 }
-                                log::debug!("STOPPED  Listening to message on {}", mqtt_msg.get_name());
                                 AnyResult::Ok(())
                             } => {
-                                log::debug!("MQTT Command Returned: {v:?}");
                                 v
                             },
                             v = rx.recv() => {
-                                log::debug!("MQTT Task Returned: {v:?}");
                                 v.ok_or(anyhow!("All error senders were dropped"))?
                             },
                         }?;
@@ -370,7 +399,6 @@ async fn listen_on_camera(camera: NeoInstance, mqtt_instance: MqttInstance) -> R
                             })?;
                         }
                     } => {
-                        log::debug!("CamConnection returned: {v:?}");
                         v
                     },
                     // Handle the floodlight
@@ -413,7 +441,6 @@ async fn listen_on_camera(camera: NeoInstance, mqtt_instance: MqttInstance) -> R
                                 AnyResult::Ok(())
                             } => v,
                         };
-                        log::debug!("Flood light returned: {v:?}");
                         match v.map_err(|e| e.downcast::<neolink_core::Error>()) {
                             Err(Ok(neolink_core::Error::UnintelligibleReply{..})) => futures::future::pending().await,
                             Ok(()) => AnyResult::Ok(()),
@@ -441,7 +468,6 @@ async fn listen_on_camera(camera: NeoInstance, mqtt_instance: MqttInstance) -> R
                                 })?;
                                 AnyResult::Ok(())
                             }.await;
-                            log::debug!("Motion returned: {v:?}");
                             match v.map_err(|e| e.downcast::<neolink_core::Error>()) {
                                 Err(Ok(neolink_core::Error::UnintelligibleReply{..})) => futures::future::pending().await,
                                 Ok(()) => AnyResult::Ok(()),
@@ -467,7 +493,7 @@ async fn listen_on_camera(camera: NeoInstance, mqtt_instance: MqttInstance) -> R
                                 }).await;
                                 let image = match image {
                                     Err(e) => match e.downcast::<neolink_core::Error>() {
-                                        Ok(neolink_core::Error::CameraServiceUnavaliable(_)) => {
+                                        Ok(neolink_core::Error::CameraServiceUnavailable{..}) => {
                                             log::debug!("Image not supported");
                                             futures::future::pending().await
                                         },
@@ -485,7 +511,6 @@ async fn listen_on_camera(camera: NeoInstance, mqtt_instance: MqttInstance) -> R
                             }
                             AnyResult::Ok(())
                         }.await;
-                        log::debug!("Snap returned: {v:?}");
                         match v.map_err(|e| e.downcast::<neolink_core::Error>()) {
                             Err(Ok(neolink_core::Error::UnintelligibleReply{..})) => futures::future::pending().await,
                             Ok(()) => AnyResult::Ok(()),
@@ -512,7 +537,7 @@ async fn listen_on_camera(camera: NeoInstance, mqtt_instance: MqttInstance) -> R
                                 }).await;
                                 let xml = match xml {
                                     Err(e) => match e.downcast::<neolink_core::Error>() {
-                                        Ok(neolink_core::Error::CameraServiceUnavaliable(_)) => {
+                                        Ok(neolink_core::Error::CameraServiceUnavailable{..}) => {
                                             log::debug!("Battery not supported");
                                             futures::future::pending().await
                                         },
@@ -530,7 +555,6 @@ async fn listen_on_camera(camera: NeoInstance, mqtt_instance: MqttInstance) -> R
                             }
                             AnyResult::Ok(())
                         }.await;
-                        log::debug!("Battery returned: {v:?}");
                         match v.map_err(|e| e.downcast::<neolink_core::Error>()) {
                             Err(Ok(neolink_core::Error::UnintelligibleReply{..})) => futures::future::pending().await,
                             Ok(()) => AnyResult::Ok(()),
@@ -541,31 +565,35 @@ async fn listen_on_camera(camera: NeoInstance, mqtt_instance: MqttInstance) -> R
                     }, if config.enable_battery => v,
                     // Handle the push notification messages
                     v = async {
-                        let mut pn = camera_pn.push_notifications().await?;
-                        let mut prev_noti = None;
-                        loop {
-                            let v = async {
-                                let noti = pn.wait_for(|noti| noti != &prev_noti && noti.is_some()).await.with_context(|| {
-                                    format!("{}: PushNoti Watch Dropped", camera_name)
-                                })?.clone();
-                                mqtt_pn.send_message("status/notification", &noti.as_ref().unwrap().message, true).await.with_context(|| {
-                                    format!("{}: Failed to publish push notification", camera_name)
-                                })?;
-                                prev_noti = noti;
-                                AnyResult::Ok(())
-                            }.await;
-                            log::debug!("PushNoti returned: {v:?}");
-                            match v.map_err(|e| e.downcast::<neolink_core::Error>()) {
-                                Err(Ok(neolink_core::Error::UnintelligibleReply{..})) => futures::future::pending().await,
-                                Ok(()) => AnyResult::Ok(()),
-                                Err(Ok(e)) => Err(e.into()),
-                                Err(Err(e)) => Err (e),
-                            }?;
+                        #[cfg(feature = "pushnoti")]
+                        {
+                            let mut pn = camera_pn.push_notifications().await?;
+                            let mut prev_noti = None;
+                            loop {
+                                let v = async {
+                                    let noti = pn.wait_for(|noti| noti != &prev_noti && noti.is_some()).await.with_context(|| {
+                                        format!("{}: PushNoti Watch Dropped", camera_name)
+                                    })?.clone();
+                                    mqtt_pn.send_message("status/notification", &noti.as_ref().unwrap().message, true).await.with_context(|| {
+                                        format!("{}: Failed to publish push notification", camera_name)
+                                    })?;
+                                    prev_noti = noti;
+                                    AnyResult::Ok(())
+                                }.await;
+                                match v.map_err(|e| e.downcast::<neolink_core::Error>()) {
+                                    Err(Ok(neolink_core::Error::UnintelligibleReply{..})) => futures::future::pending().await,
+                                    Ok(()) => AnyResult::Ok(()),
+                                    Err(Ok(e)) => Err(e.into()),
+                                    Err(Err(e)) => Err (e),
+                                }?;
+                            }
                         }
-                    } => v,
+                        #[cfg(not(feature = "pushnoti"))]
+                        unreachable!()
+                    }, if cfg!(feature = "pushnoti") => v,
                     // Handle the floodlight task activation
                     v = async {
-                        let flt_status = camera_floodlight_tasks.run_task(|cam| Box::pin(async move {
+                        let flt_status = camera_floodlight_tasks.run_passive_task(|cam| Box::pin(async move {
                             Ok(cam.is_flightlight_tasks_enabled().await?)
                         })).await;
                         if flt_status.is_err() {
@@ -608,7 +636,6 @@ async fn listen_on_camera(camera: NeoInstance, mqtt_instance: MqttInstance) -> R
         };
     };
 
-    log::debug!("Mqtt::listen_on_camera Cancel: {r:?}");
     drop(drop_cancel);
     r?;
     Ok(())
@@ -1057,10 +1084,8 @@ async fn handle_mqtt_message(
                                 .run_task(|_cam| Box::pin(async move { AnyResult::Ok(()) }))
                                 .await;
 
-                            log::debug!("Wakeup counting down");
                             sleep(Duration::from_secs(secs * 60)).await;
 
-                            log::debug!("Wakeup complete");
                             drop(permit);
                         });
                         "OK"
@@ -1156,9 +1181,11 @@ async fn handle_mqtt_message(
                     "FAIL"
                 }
                 Ok(xml) => {
-                    let bytes_res =
-                        yaserde::ser::serialize_with_writer(&xml, vec![], &Default::default());
-                    match bytes_res {
+                    let ser_xml = {
+                        let mut buf = bytes::BytesMut::new();
+                        quick_xml::se::to_writer(&mut buf, &xml).map(|_| buf.to_vec())
+                    };
+                    match ser_xml {
                         Ok(bytes) => match String::from_utf8(bytes) {
                             Ok(str) => {
                                 mqtt.send_message("status/battery", &str, false)
@@ -1200,9 +1227,11 @@ async fn handle_mqtt_message(
                     "FAIL"
                 }
                 Ok(xml) => {
-                    let bytes_res =
-                        yaserde::ser::serialize_with_writer(&xml, vec![], &Default::default());
-                    match bytes_res {
+                    let ser_xml = {
+                        let mut buf = bytes::BytesMut::new();
+                        quick_xml::se::to_writer(&mut buf, &xml).map(|_| buf.to_vec())
+                    };
+                    match ser_xml {
                         Ok(bytes) => match String::from_utf8(bytes) {
                             Ok(str) => {
                                 mqtt.send_message("status/pir", &str, false)
@@ -1245,9 +1274,11 @@ async fn handle_mqtt_message(
                     "FAIL"
                 }
                 Ok(xml) => {
-                    let bytes_res =
-                        yaserde::ser::serialize_with_writer(&xml, vec![], &Default::default());
-                    match bytes_res {
+                    let ser_xml = {
+                        let mut buf = bytes::BytesMut::new();
+                        quick_xml::se::to_writer(&mut buf, &xml).map(|_| buf.to_vec())
+                    };
+                    match ser_xml {
                         Ok(bytes) => match String::from_utf8(bytes) {
                             Ok(str) => {
                                 mqtt.send_message("status/ptz", &str, false)

@@ -37,10 +37,14 @@ impl NeoCamThread {
     }
     async fn run_camera(&mut self, config: &CameraConfig) -> AnyResult<()> {
         let name = config.name.clone();
+        log::trace!("Attempting connection with config: {config:?}");
         let camera = Arc::new(connect_and_login(config).await?);
+        log::trace!("  - Connected");
 
         sleep(Duration::from_secs(2)).await; // Delay a little since some calls will error if camera is waking up
-        update_camera_time(&camera, &name, config.update_time).await?;
+        if let Err(e) = update_camera_time(&camera, &name, config.update_time).await {
+            log::warn!("Could not set camera time, (perhaps missing on this camera of your login in not an admin): {e:?}");
+        }
         sleep(Duration::from_secs(2)).await; // Delay a little since some calls will error if camera is waking up
 
         self.camera_watch.send_replace(Arc::downgrade(&camera));
@@ -49,11 +53,9 @@ impl NeoCamThread {
         // Now we wait for a disconnect
         tokio::select! {
             _ = cancel_check.cancelled() => {
-                log::debug!("{name}: Camera Cancelled");
                 AnyResult::Ok(())
             }
             v = camera.join() => {
-                log::debug!("{name}: Camera Join: {:?}", v);
                 v?;
                 Ok(())
             },
@@ -62,13 +64,16 @@ impl NeoCamThread {
                 let mut missed_pings = 0;
                 loop {
                     interval.tick().await;
+                    log::trace!("Sending ping");
                     match timeout(Duration::from_secs(5), camera.get_linktype()).await {
                         Ok(Ok(_)) => {
+                            log::trace!("Ping reply");
                             missed_pings = 0;
                             continue
                         },
-                        Ok(Err(neolink_core::Error::UnintelligibleReply { .. })) => {
+                        Ok(Err(neolink_core::Error::UnintelligibleReply { reply, why })) => {
                             // Camera does not support pings just wait forever
+                            log::trace!("Pings not supported: {reply:?}: {why}");
                             futures::future::pending().await
                         },
                         Ok(Err(e)) => {
@@ -76,12 +81,12 @@ impl NeoCamThread {
                         },
                         Err(_) => {
                             // Timeout
-                            if missed_pings > 5 {
+                            if missed_pings < 5 {
                                 missed_pings += 1;
                                 continue;
                             } else {
-                                log::debug!("Timed out waiting for camera ping reply. Assuming unsupported");
-                                futures::future::pending().await
+                                log::error!("Timed out waiting for camera ping reply");
+                                break Err(anyhow::anyhow!("Timed out waiting for camera ping reply"));
                             }
                         }
                     }
@@ -123,6 +128,7 @@ impl NeoCamThread {
                     None
                 }
                 Ok(_) = state.wait_for(|state| matches!(state, NeoCamThreadState::Disconnected)) => {
+                    log::trace!("State changed to disconnect");
                     None
                 }
                 v = self.run_camera(&config) => {
@@ -135,6 +141,7 @@ impl NeoCamThread {
                 // If None go back and reload NOW
                 //
                 // This occurs if there was a config change
+                log::trace!("Config change or Manual disconnect");
                 continue;
             }
 
@@ -152,7 +159,7 @@ impl NeoCamThread {
             match result {
                 Ok(()) => {
                     // Normal shutdown
-                    log::debug!("Cancel:: NeoCamThread::NormalShutdown");
+                    log::trace!("Normal camera shutdown");
                     self.cancel.cancel();
                     return Ok(());
                 }
@@ -164,7 +171,6 @@ impl NeoCamThread {
                         Some(neolink_core::Error::CameraLoginFail) => {
                             // Fatal
                             log::error!("{name}: Login credentials were not accepted");
-                            log::debug!("NeoCamThread::run Login Cancel");
                             self.cancel.cancel();
                             return Err(e);
                         }
@@ -184,7 +190,6 @@ impl NeoCamThread {
 
 impl Drop for NeoCamThread {
     fn drop(&mut self) {
-        log::debug!("Cancel:: NeoCamThread::drop");
         self.cancel.cancel();
     }
 }

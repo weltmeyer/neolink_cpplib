@@ -1,6 +1,7 @@
 use super::DiscoveryResult;
 use crate::bc::codex::BcCodex;
 use crate::bc::model::*;
+use crate::bc_protocol::errors::BcUdpDropReciverKind;
 use crate::bcudp::codex::BcUdpCodex;
 use crate::bcudp::{model::*, xml::*};
 use crate::{Credentials, Error, Result};
@@ -350,30 +351,29 @@ impl UdpPayloadInner {
                     loop {
                         break tokio::select!{
                             _ = recv_timeout.as_mut() => {
-                                log::trace!("DroppedConnection: Timeout");
-                                Err(Error::DroppedConnection)
+                                Err(Error::BcUdpTimeout)
                             }
                             packet = inner.next() => {
                                 log::trace!("Cam->App");
-                                let packet = packet.ok_or(Error::DroppedConnection)??;
+                                let packet = packet.ok_or(Error::BcUdpDropReciver(BcUdpDropReciverKind::NoneRecieved))??;
                                 recv_timeout.as_mut().reset(Instant::now() + Duration::from_secs(TIME_OUT));
-                                // let packet = socket_rx.next().await.ok_or(Error::DroppedConnection)??;
-                                socket_out_tx.try_send(packet).map_err(|_| Error::DroppedConnection)?;
+                                // let packet = socket_rx.next().await.ok_or(Error::BcUdpDropReciver)??;
+                                socket_out_tx.try_send(packet).map_err(|e| Error::BcUdpDropReciver(BcUdpDropReciverKind::SendFailed(format!("{e:?}"))))?;
                                 continue;
                             },
                             packet = socket_in_rx.next() => {
-                                let packet = packet.ok_or(Error::DroppedConnection)?;
+                                let packet = packet.ok_or(Error::BcUdpDropSender)?;
                                 match tokio::time::timeout(tokio::time::Duration::from_millis(250), inner.send((packet, thread_camera_addr))).await {
                                     Ok(written) => {
                                         written?;
                                     }
                                     Err(_) => {
+                                        log::trace!("Socket Error, attempting reconnect over a new one");
                                         // Socket is (maybe) broken
                                         // Seems to happen with network reconnects like over
                                         // a lossy cellular network
-                                        log::debug!("Quick reconnect: Due to socket timeout");
-                                        let stream = Arc::new(tokio::time::timeout(tokio::time::Duration::from_millis(250), connect_try_port(inner.inner.get_ref().local_addr()?.port())).await.map_err(|_| Error::DroppedConnection)??);
-                                        inner = tokio::time::timeout(tokio::time::Duration::from_millis(250), BcUdpSource::new_from_socket(stream, inner.addr)).await.map_err(|_| Error::DroppedConnection)??;
+                                        let stream = Arc::new(tokio::time::timeout(tokio::time::Duration::from_millis(250), connect_try_port(inner.inner.get_ref().local_addr()?.port())).await.map_err(|_| Error::BcUdpReconnectTimeout)??);
+                                        inner = tokio::time::timeout(tokio::time::Duration::from_millis(250), BcUdpSource::new_from_socket(stream, inner.addr)).await.map_err(|_| Error::BcUdpReconnectTimeout)??;
 
                                         // Inform the camera that we are the same client
                                         //
@@ -384,13 +384,10 @@ impl UdpPayloadInner {
                                                 let mut rng = thread_rng();
                                                 (rng.gen::<u8>()) as u32
                                             },
-                                            payload: UdpXml {
-                                                c2d_hb: Some(C2dHb {
+                                            payload: UdpXml::C2dHb(C2dHb {
                                                     cid: thread_client_id,
                                                     did: thread_camera_id,
                                                 }),
-                                                ..Default::default()
-                                            },
                                         });
                                         let _ = tokio::time::timeout(tokio::time::Duration::from_millis(250), inner.send((msg, thread_camera_addr))).await;
                                     }
@@ -404,7 +401,6 @@ impl UdpPayloadInner {
                     Ok(())
                 } => v,
             };
-            log::debug!("UdpPayloadInner::new SendToSocket Cancel: {:?}", result);
             send_cancel.cancel();
             result
         });
@@ -449,13 +445,10 @@ impl UdpPayloadInner {
                                 let mut rng = thread_rng();
                                 (rng.gen::<u8>()) as u32
                             },
-                            payload: UdpXml {
-                                c2d_hb: Some(C2dHb {
+                            payload: UdpXml::C2dHb(C2dHb {
                                     cid: thread_client_id,
                                     did: thread_camera_id,
                                 }),
-                                ..Default::default()
-                            },
                         });
                         if thread_sender.send(msg).await.is_err() {
                             break Result::Ok(());
@@ -499,10 +492,7 @@ impl UdpPayloadInner {
                 log::trace!("App->Camera");
                 // Incomming from application
                 // Outgoing on socket
-                if v.is_none() {
-                    log::trace!("DroppedConnection: self.thread_sink.next(): {:?}", v);
-                }
-                let item = v.ok_or(Error::DroppedConnection)?;
+                let item = v.ok_or(Error::BcUdpDropSender)?;
 
                 for chunk in item.chunks(MTU - UDPDATA_HEADER_SIZE) {
                     let udp_data = UdpData {
@@ -520,12 +510,23 @@ impl UdpPayloadInner {
                 log::trace!("Camera->App");
                 // Incomming from socket
                 // Outgoing to application
-                if v.is_none() {
-                    log::trace!("DroppedConnection: self.socket_out.next()");
-                }
-                let (item, addr) = v.ok_or(Error::DroppedConnection)?;
+                let (item, addr) = v.ok_or(Error::BcUdpDropReciver(BcUdpDropReciverKind::NoneRecieved))?;
                 if addr == camera_addr {
                     match item {
+                        BcUdp::Discovery(UdpDiscovery{
+                            payload: UdpXml::D2cHb(D2cHb {
+                                cid,
+                                did,
+                            }),
+                            ..
+                        }) => {
+                            if cid != self.client_id {
+                                log::info!("Camera sent different client ID in HB");
+                            }
+                            if did != self.camera_id {
+                                log::info!("Camera sent different device ID in HB");
+                            }
+                        },
                         BcUdp::Discovery(_disc) => {},
                         BcUdp::Ack(ack) => {
                             if ack.connection_id == self.client_id {
@@ -554,6 +555,7 @@ impl UdpPayloadInner {
             self.packets_want += 1;
             self.thread_stream.feed(Ok(payload)).await?;
         }
+        log::trace!("recieved: {}", self.recieved.len());
         log::trace!("Flush");
         self.socket_in.flush().await?;
         self.thread_stream.flush().await?;
@@ -611,6 +613,7 @@ impl UdpPayloadInner {
             }
         }
         self.ack_latency.feed_ack();
+        log::trace!("sent: {}", self.sent.len());
     }
 }
 
@@ -649,7 +652,7 @@ impl UdpPayloadSource {
                         if payload_inner.thread_stream.is_closed() {
                             log::trace!("payload_inner.thread_stream.is_closed");
                             payload_inner.thread_sink.close();
-                            return Err(Error::DroppedConnection);
+                            return Err(Error::BcUdpPayloadDroppedInner);
                         }
                         log::trace!("Calling inner");
                         let res = payload_inner.run().await;

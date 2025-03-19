@@ -7,7 +7,7 @@ use super::AnyResult;
 use crate::config::*;
 
 use anyhow::Context;
-use gstreamer::glib::{self, object_subclass, subclass::types::ObjectSubclass, MainLoop, Object};
+use gstreamer::glib::{self, object_subclass, MainLoop, Object};
 use gstreamer_rtsp::RTSPAuthMethod;
 use gstreamer_rtsp_server::{
     gio::{TlsAuthenticationMode, TlsCertificate},
@@ -47,17 +47,25 @@ impl NeoRtspServer {
         // Setup auth
         let auth = factory.auth().unwrap_or_default();
         auth.set_supported_methods(RTSPAuthMethod::Basic);
-        let mut un_authtoken = RTSPToken::new(&[
-            //RTSP_TOKEN_MEDIA_FACTORY_ROLE: Means look inside the media factory settings and use the same permissions this user (`"anonymous"`) has
-            (RTSP_TOKEN_MEDIA_FACTORY_ROLE, &"anonymous"),
-        ]);
+        let mut un_authtoken = RTSPToken::builder()
+            .field(
+                //RTSP_TOKEN_MEDIA_FACTORY_ROLE: Means look inside the media factory settings and use the same permissions this user (`"anonymous"`) has
+                RTSP_TOKEN_MEDIA_FACTORY_ROLE,
+                "anonymous",
+            )
+            .build();
         auth.set_default_token(Some(&mut un_authtoken));
         factory.set_auth(Some(&auth));
 
         factory.connect_client_connected(|_, client| {
             client.connect_new_session(|_, session| {
                 log::debug!("New Session");
-                session.set_timeout(5);
+                // Session timeout too small causes us to drop
+                // some ffmpeg clients too soon
+                // Too long causes too many open connections with
+                // clients like frigate (that seem to open multiple
+                //   connections without shutting down old ones)
+                session.set_timeout(30);
             });
         });
 
@@ -212,7 +220,9 @@ impl NeoRtspServerImpl {
         let mut locked_users = self.users.write().await;
         let auth = self.obj().auth().unwrap();
 
-        let token = RTSPToken::new(&[(RTSP_TOKEN_MEDIA_FACTORY_ROLE, &username)]);
+        let token = RTSPToken::builder()
+            .field(RTSP_TOKEN_MEDIA_FACTORY_ROLE, username)
+            .build();
         let basic = RTSPAuth::make_basic(username, password);
 
         if let Some(old_basic) = locked_users.get(username) {

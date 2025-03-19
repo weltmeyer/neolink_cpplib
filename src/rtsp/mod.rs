@@ -104,7 +104,7 @@ pub(crate) async fn main(_opt: Opt, reactor: NeoReactor) -> Result<()> {
                 loop {
                     thread_config.changed().await?;
                     if let Err(e) = thread_rtsp.set_up_tls(&thread_config.borrow().clone()) {
-                        log::error!("Could not seup TLS: {e}");
+                        log::error!("Could not setup TLS: {e}");
                     }
                 }
             } => v
@@ -128,7 +128,7 @@ pub(crate) async fn main(_opt: Opt, reactor: NeoReactor) -> Result<()> {
 
                     let config = thread_config.borrow().clone();
                     if let Err(e) = apply_users(&thread_rtsp, &curr_users).await {
-                        log::error!("Could not seup TLS: {e}");
+                        log::error!("Could not setup TLS: {e}");
                     }
 
                     if config.certificate.is_none() && !curr_users.is_empty() {
@@ -162,7 +162,7 @@ pub(crate) async fn main(_opt: Opt, reactor: NeoReactor) -> Result<()> {
 
                     for name in config_names.iter() {
                         if ! cameras.contains_key(name) {
-                            log::info!("{name}: Rtsp Staring");
+                            log::info!("{name}: Rtsp Starting");
                             let local_cancel = CancellationToken::new();
                             cameras.insert(name.clone(),local_cancel.clone() );
                             let thread_global_cancel = thread_cancel2.clone();
@@ -186,7 +186,6 @@ pub(crate) async fn main(_opt: Opt, reactor: NeoReactor) -> Result<()> {
 
                     for (running_name, token) in cameras.iter() {
                         if ! config_names.contains(running_name) {
-                            log::debug!("Rtsp::main Cancel1");
                             token.cancel();
                         }
                     }
@@ -217,7 +216,6 @@ pub(crate) async fn main(_opt: Opt, reactor: NeoReactor) -> Result<()> {
                 // Panicked or error in task
                 // Cancel all and await terminate
                 log::error!("Error: {e}");
-                log::debug!("Rtsp::main Cancel2");
                 global_cancel.cancel();
                 rtsp.quit().await?;
             }
@@ -235,7 +233,8 @@ async fn apply_users(rtsp: &NeoRtspServer, curr_users: &HashSet<UserConfig>) -> 
     // Add those missing
     for user in curr_users.iter() {
         log::debug!("Adding user {} to rtsp server", user.name);
-        rtsp.add_user(&user.name, &user.pass).await?;
+        rtsp.add_user(&user.name, &user.pass.clone().unwrap_or_default())
+            .await?;
     }
     // Remove unused
     let rtsp_users = rtsp.get_users().await?;
@@ -291,8 +290,6 @@ async fn camera_main(camera: NeoInstance, rtsp: &NeoRtspServer) -> Result<()> {
         AnyResult::Ok(())
     });
 
-    log::debug!("{name}: Camera Main::Loop");
-
     let mut camera_config = camera.config().await?.clone();
     loop {
         let prev_stream_config = camera_config.borrow_and_update().stream;
@@ -316,7 +313,6 @@ async fn camera_main(camera: NeoInstance, rtsp: &NeoRtspServer) -> Result<()> {
             },
             v = async {
                 // This select handles enabling the right stream
-                log::debug!("{name}: Camera Main::Select Stream");
                 // and setting up the users
                 let all_users = rtsp.get_users().await?.iter().filter(|a| *a != "anyone" && *a != "anonymous").cloned().collect::<HashSet<_>>();
                 let permitted_users: HashSet<String> = match &prev_stream_users {
@@ -340,7 +336,6 @@ async fn camera_main(camera: NeoInstance, rtsp: &NeoRtspServer) -> Result<()> {
                 let mut supported_streams_3 = supported_streams.clone();
                 tokio::select! {
                     v = async {
-                        log::debug!("{name}: Camera Main::Select Main");
                         let name = camera.config().await?.borrow().name.clone();
                         let mut paths = vec![
                             format!("/{name}/main"),
@@ -368,10 +363,9 @@ async fn camera_main(camera: NeoInstance, rtsp: &NeoRtspServer) -> Result<()> {
                         log::debug!("{}: Preparing at {}", name, paths.join(", "));
 
                         supported_streams_1.wait_for(|ss| ss.contains(&StreamKind::Main)).await?;
-                        stream_main(camera.stream(StreamKind::Main).await?, camera.clone(), rtsp, &permitted_users, &paths).await
+                        stream_main(camera.clone(), StreamKind::Main, rtsp, &permitted_users, &paths).await
                     }, if active_streams.contains(&StreamKind::Main) => v,
                     v = async {
-                        log::debug!("{name}: Camera Main::Select Sub");
                         let name = camera.config().await?.borrow().name.clone();
                         let mut paths = vec![
                             format!("/{name}/sub"),
@@ -403,10 +397,10 @@ async fn camera_main(camera: NeoInstance, rtsp: &NeoRtspServer) -> Result<()> {
                         log::debug!("{}: Preparing at {}", name, paths.join(", "));
 
                         supported_streams_2.wait_for(|ss| ss.contains(&StreamKind::Sub)).await?;
-                        stream_main(camera.stream(StreamKind::Sub).await?,camera.clone(), rtsp, &permitted_users, &paths).await
+
+                        stream_main(camera.clone(), StreamKind::Sub, rtsp, &permitted_users, &paths).await
                     }, if active_streams.contains(&StreamKind::Sub) => v,
                     v = async {
-                        log::debug!("{name}: Camera Main::Select Extern");
                         let name = camera.config().await?.borrow().name.clone();
                         let mut paths = vec![
                             format!("/{name}/extern"),
@@ -437,7 +431,7 @@ async fn camera_main(camera: NeoInstance, rtsp: &NeoRtspServer) -> Result<()> {
                         log::debug!("{}: Preparing at {}", name, paths.join(", "));
 
                         supported_streams_3.wait_for(|ss| ss.contains(&StreamKind::Extern)).await?;
-                        stream_main(camera.stream(StreamKind::Extern).await?,camera.clone(), rtsp, &permitted_users, &paths).await
+                        stream_main(camera.clone(), StreamKind::Extern, rtsp, &permitted_users, &paths).await
                     }, if active_streams.contains(&StreamKind::Extern) => v,
                     else => {
                         // all disabled just wait here until config is changed

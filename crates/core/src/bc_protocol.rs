@@ -16,6 +16,7 @@ mod abilityinfo;
 mod battery;
 mod connection;
 mod credentials;
+mod email;
 mod errors;
 mod floodlight;
 mod keepalive;
@@ -30,6 +31,7 @@ mod ptz;
 mod pushinfo;
 mod reboot;
 mod resolution;
+mod services;
 mod siren;
 mod snap;
 mod stream;
@@ -38,6 +40,7 @@ mod support;
 mod talk;
 mod time;
 mod uid;
+mod users;
 mod version;
 
 pub(crate) use connection::*;
@@ -194,7 +197,7 @@ impl BcCamera {
                 DiscoveryMethods::Map => (true, true, true, false),
                 DiscoveryMethods::Relay => (true, true, true, true),
                 DiscoveryMethods::Cellular => (false, false, true, true),
-                DiscoveryMethods::Debug => (false, false, false, true),
+                DiscoveryMethods::Debug => (false, false, true, false),
             };
 
             let res = tokio::select! {

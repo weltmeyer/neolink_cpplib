@@ -33,10 +33,10 @@ features not yet in upstream master.
 **Minor Features**:
 
 - Improved error messages when missing gstreamer plugins
-- Protocol more closely follows offical reolink format
+- Protocol more closely follows official reolink format
   - Possibly can handle more simulatenous connections
 - More ways to connect to the camera. Including Relaying through reolink
-servers
+  servers
 - Camera battery levels can be displayed in the log
 
 ## Installation
@@ -50,7 +50,7 @@ Install the latest [gstreamer](https://gstreamer.freedesktop.org/download/)
 (1.20.5 as of writing this).
 
 - **Windows**: ensure you install `full` when prompted in the MSI options.
-- **Mac**: Install the dpkg version on the offical gstreamer website over
+- **Mac**: Install the dpkg version on the official gstreamer website over
   the brew version
 - **Ubuntu/Debian**: These packages should work
 
@@ -67,9 +67,10 @@ sudo apt install \
 ```
 
 - **Windows**: You may also need to
-[install openssl](https://wiki.openssl.org/index.php/Binaries)
+  [install openssl](https://wiki.openssl.org/index.php/Binaries)
 - **Macos**: You may also need to
-[install openssl](https://wiki.openssl.org/index.php/Binaries) or `brew install openssl@1.1`
+  [install openssl](https://wiki.openssl.org/index.php/Binaries) or
+  `brew install openssl@1.1`
 - **Ubuntu/Debian**: Install the `libssl` package
 
 Make a config file see below.
@@ -114,7 +115,7 @@ using the terminal in the same folder the neolink binary is in.
 ### Discovery
 
 To connect to a camera using a UID we need to find the IP address of the camera
- with that UID
+with that UID
 
 The IP is discovered with four methods
 
@@ -249,7 +250,7 @@ Status Messages:
   there will be no `/status/preview` message. Only published when
   `enable_preview` is true in the config
 - `/status/floodlight_tasks` The current status of the floodlight tasks
-   used updated every 2s by default
+  used updated every 2s by default
 
 Query Messages:
 
@@ -257,7 +258,7 @@ Query Messages:
 - `/query/pir` Request that the camera reports its pir status
 - `/query/ptz/preset` Request that the camera reports its PTZ presets
 - `/query/preview` Request that the camera post a base64 encoded jpeg
-    of the stream to `/status/preview` now, ignoring the timer
+  of the stream to `/status/preview` now, ignoring the timer
 
 ### Controlling RTSP from MQTT
 
@@ -269,7 +270,7 @@ reflected in the rtsp
 
 These include changing the:
 
-- Avaliable users
+- Available users
 
 ```toml
 [[users]]
@@ -284,7 +285,7 @@ These include changing the:
   permitted_users = [ "me" ]
 ```
 
-- Avaliable streams
+- Available streams
 
 ```toml
 [[cameras]]
@@ -324,7 +325,7 @@ enable_motion = false        # motion detection
                              # (limited battery drain since it
                              # is a passive listening connection)
                              #
-enable_light = false         # flood lights only avaliable on some camera
+enable_light = false         # flood lights only available on some camera
                              # (limited battery drain since it
                              # is a passive listening connection)
                              #
@@ -355,7 +356,7 @@ must be manually specified.
   features = ["floodlight"]
 ```
 
-Avaliable features are:
+Available features are:
 
 - `floodlight`: This adds a light control to home assistant
 - `camera`: This adds a camera preview to home assistant. It is only updated
@@ -372,6 +373,36 @@ Avaliable features are:
   camera
 - `battery`: This adds a battery level sensor to home assistant
 - `siren`: Adds a siren button to home assistant
+
+### Extra Camera Settings
+
+Listed below are extra camera settings:
+
+```toml
+[[cameras]]
+name = "Camera01"
+username = "admin"
+password = "password"
+uid = "ABCDEF0123456789"
+debug = false # Displays Debug XML messages from camera
+enabled = true # Enable or Disable the camera
+update_time = false # When camera connects, force the setting of the camera date/time to now. The default is false
+print_format = "None"  # Type of format that logs are displayed in (None, Human, Xml). The default is None
+```
+
+- **Debug:** Will dump the various XMLs from the camera as they are recieved
+and decrypted. Leave this off unless asked for it to fix an issue.
+
+- **Enabled:** Useful if you want to remove a camera from rtsp without deleting
+it from the config
+
+- **update_time:** Used to FORCE an update on the camera time. Usually it checks
+if it is needed but this
+will force it regardless. (Mostly this was introduced to address a specific
+ssue a user had)
+
+- **print_format:** Used for adjusting printing of some values mostly, battery
+messages
 
 ### Pause
 
@@ -424,6 +455,10 @@ after it stops being used.
 Neolink considers it as being used if there is an active stream running, or
 if there is motion being detected or an mqtt command being run
 
+[Because google remove the api for the push notifications we cannot
+reliably use push notifications to wake up, so motion won't wake
+up neolink anymore]
+
 You can make neolink stop active streams when there are no rtsp clients using
 
 ```toml
@@ -434,9 +469,11 @@ You can make neolink stop active streams when there are no rtsp clients using
 Once in the disconnected state. Neolink will stay disconnected until there is a
 new requested activation such as a client connecting or an mqtt command
 
-Neolink will also wake up on push notifications from the camera. These are usually
+~Neolink will also wake up on push notifications from the camera. These are usually
 sent by the camera on motion or PIR alarms. To disable this you can set
-`push_notifications = false` in the `[[cameras]]` config
+`push_notifications = false` in the `[[cameras]]` config~
+
+[Google removed the apis we were using for push notifications]
 
 ### Docker
 
@@ -456,6 +493,13 @@ docker pull quantumentangledandy/neolink
 # network=host, notably macos lacks this option.
 docker run --network host --volume=$PWD/config.toml:/etc/neolink.toml quantumentangledandy/neolink
 ```
+
+#### Environmental Variables
+
+There are currently 2 environmental variables available as part of the container:
+
+- `NEO_LINK_MODE`: defaults to `"rtsp"` if not set, other options are "mqtt" or "mqtt-rtsp".
+- `NEO_LINK_PORT`: defaults to `8554`, set this to your required port value.
 
 ### Image
 

@@ -20,9 +20,9 @@ pub struct BcStream<'a> {
     rx: &'a mut ReceiverStream<Result<Bc>>,
 }
 
-impl<'a> Unpin for BcStream<'a> {}
+impl Unpin for BcStream<'_> {}
 
-impl<'a> Stream for BcStream<'a> {
+impl Stream for BcStream<'_> {
     type Item = Result<Bc>;
 
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Result<Bc>>> {
@@ -79,16 +79,13 @@ impl<'a> BcSubscription<'a> {
     pub fn payload_stream(&'_ mut self) -> impl Stream<Item = IoResult<Vec<u8>>> + '_ {
         (&mut self.rx).filter_map(|x| match x {
             Ok(Bc {
-                meta: BcMeta { msg_id, .. },
+                meta: BcMeta { .. },
                 body:
                     BcBody::ModernMsg(ModernMsg {
                         payload: Some(BcPayloads::Binary(data)),
                         ..
                     }),
-            }) => {
-                log::debug!("PayloadStream got binary data: {msg_id}");
-                Some(Ok(data))
-            }
+            }) => Some(Ok(data)),
             Ok(_) => None,
             Err(e) => Some(Err(IoError::new(ErrorKind::Other, e))),
         })
@@ -97,15 +94,9 @@ impl<'a> BcSubscription<'a> {
     pub fn bcmedia_stream(&'_ mut self, strict: bool) -> impl Stream<Item = Result<BcMedia>> + '_ {
         let async_read = self
             .payload_stream()
-            .map(|frame| {
-                log::debug!("- BcMedia Payloader got packet");
-                frame
-            })
+            .map(|frame| frame)
             .into_async_read()
             .compat();
-        FramedRead::new(async_read, BcMediaCodex::new(strict)).map(|frame| {
-            log::debug!("  - BcMedia Payloader decoded packet");
-            frame
-        })
+        FramedRead::new(async_read, BcMediaCodex::new(strict)).map(|frame| frame)
     }
 }
