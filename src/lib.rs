@@ -89,7 +89,7 @@ pub extern "C" fn lib_cam_open(
     //let ipadr=IpAddr::from_str(&ipaddress).unwrap();
     let ipadr=socketaddr.ip();
     let finalAddr=vec![ipadr];
-   let name="Extern";
+    let name="Extern";
     let options = BcCameraOpt {
         name: name.to_string(),
         channel_id: 0,
@@ -106,7 +106,7 @@ pub extern "C" fn lib_cam_open(
         max_discovery_retries: 0,
     };
 
-    neolink_core::bc_protocol::Error::AuthFailed
+    //neolink_core::bc_protocol::Error::AuthFailed
     //let mut rt = Runtime::new().unwrap();
     let cameraResult: std::result::Result<BcCamera,neolink_core::bc_protocol::Error> = RT.block_on(async { BcCamera::new(&options).await});
 
@@ -274,8 +274,8 @@ pub extern "C" fn lib_cam_stop(ptr: *mut BcCamera) {
     //let mut rt = Runtime::new().unwrap();
     RT.block_on(
         async {
-            cam.stop_video(StreamKind::Main).await;
-            cam.shutdown().await;
+            let _ = cam.stop_video(StreamKind::Main).await;
+            let _ = cam.shutdown().await;
         }
     );
 
@@ -289,7 +289,8 @@ pub extern "C" fn lib_cam_stop(ptr: *mut BcCamera) {
     
     RT.block_on(
         async {
-            cam.join().await;
+            let _ = cam.join().await;
+            
         }
     );
     log::debug!("Join!");
