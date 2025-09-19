@@ -184,7 +184,13 @@ pub extern "C" fn lib_cam_start_stream(
                     log::debug!("Waiting for frame");
                     
                     let data = match stream_data.get_data().await{
-                        Ok(x)=>x.expect("JW:error2"),
+                        Ok(x)=>{
+                            if x.is_err(){
+                                break;
+                            }
+                                
+                            x.expect("JW:error2")
+                        },
                         Err(_e)=>break
                     };
                     
@@ -283,6 +289,7 @@ pub extern "C" fn lib_cam_start_stream(
 
 #[no_mangle]
 pub extern "C" fn lib_cam_stop(ptr: *mut BcCamera) {
+    log::debug!("ShutdownPre...");
     let cam = unsafe {
         assert!(!ptr.is_null());
         &mut *ptr
